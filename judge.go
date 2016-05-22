@@ -229,7 +229,9 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 	
 	tcCounter := 0
 	for tc, res := <-tests; res; tc, res = <-tests {
+		fmt.Println("A")
 		res := exe.Run(j.Time, tc.In)
+		fmt.Println("B")
 		
 		if res.Status != ExecFinished {
 			switch res.Status {
