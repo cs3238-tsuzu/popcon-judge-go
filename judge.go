@@ -132,7 +132,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 		
 		return
 	}
-	err = os.Chmod(path, int(uidInt), int(gidInt))
+	err = os.Chmod(path, 0664)
 	
 	if err != nil {
 		ch <- CreateInternalError("Failed to chmod the directory. " + err.Error())
