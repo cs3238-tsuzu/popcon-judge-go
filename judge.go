@@ -124,7 +124,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 	
 	defer os.RemoveAll(path)
 
-	err = os.Chown(path, int(uidInt), int(gidInt))
+	err = nil//os.Chown(path, int(uidInt), int(gidInt))
 
 	if err != nil {
 		ch <- CreateInternalError("Failed to chown the directory. " + err.Error())
