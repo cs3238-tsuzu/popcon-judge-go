@@ -107,9 +107,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 		ch <- CreateInternalError("Failed to parseInt gid. " + err.Error())
 		
 		return
-
 	}
-
 	
 	defer exec.Command("userdel", id)
 	
@@ -170,7 +168,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 
 	// Compile
 	if j.Compile != nil {
-		exe, err := NewExecutor(id, 512 * 1024 * 1024, j.Compile.Cmd, j.Compile.Image, []string{path + ":" + "/work"}, uid.Uid)
+		exe, err := NewExecutor(id, 512 * 1024 * 1024, []string{"ls", "-la", "/work"}, j.Compile.Image, []string{path + ":" + "/work"}, uid.Uid)
 		
 		if err != nil {
 			ch <- CreateInternalError("Failed to create a Docker container to compile your code." + err.Error())
@@ -205,6 +203,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 			return
 		}
 	}
+	return
 	
 	exe, err := NewExecutor(id, j.Mem, j.Exec.Cmd, j.Exec.Image, []string{path + ":" + "/work:ro"}, uid.Uid)
 	
