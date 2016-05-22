@@ -8,6 +8,7 @@ import "strconv"
 import "github.com/seehuhn/mt19937"
 import "time"
 import "os/user"
+import "fmt"
 
 var cli *client.Client
 
@@ -278,7 +279,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 				maxMem = -1
 				maxTime = -1
 			}else {
-				fmt.Print
+				fmt.Println(tc.Name)
 				if res.Stdout == tc.Out {
 					ch <- JudgeStatus{Case: &tc.Name, JR: Accepted, Mem: res.Mem, Time: res.Time}
 					r = Accepted
