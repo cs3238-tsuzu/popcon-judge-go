@@ -8,8 +8,6 @@ import "strconv"
 import "github.com/seehuhn/mt19937"
 import "time"
 import "os/user"
-import "fmt"
-import "math"
 
 var cli *client.Client
 
