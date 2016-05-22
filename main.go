@@ -159,7 +159,6 @@ func main() {
 		}else {
 			cas = "<nil>"
 		}
-		fmt.Println(cas)
 		fmt.Printf("Case: %s, Msg: %s, Result: %s, Memory: %dKB, Time: %dms\n", cas, msg, JudgeResultToStr[int(c.JR)], c.Mem / 1000, c.Time)
 	}
 	
