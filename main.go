@@ -93,7 +93,7 @@ func main() {
 			return
 		}
 	}
-	
+
 	// Copy instances to global ones
 	workingDirectory = *wdir
 
@@ -115,9 +115,9 @@ func main() {
 
 	res := exe.Run(1000, "Hello")
 	*/
-	
+
 	j := Judge{}
-	
+
 	j.Code = `
 		#include <iostream>
 		
@@ -126,49 +126,57 @@ func main() {
 		}
 	`
 	j.Compile = &ExecRequest{
-		Cmd: []string{"g++", "-std=c++14", "-O2", "/work/main.cpp", "-o", "/work/a.out"},
-		Image: "ubuntu-mine:16.04",
+		Cmd:            []string{"g++", "-std=c++14", "-O2", "/work/main.cpp", "-o", "/work/a.out"},
+		Image:          "ubuntu-mine:16.04",
 		SourceFileName: "main.cpp",
 	}
 	j.Exec = ExecRequest{
-		Cmd: []string{"/work/a.out"},
-		Image: "ubuntu-mine:16.04",
+		Cmd:            []string{"/work/a.out"},
+		Image:          "ubuntu-mine:16.04",
 		SourceFileName: "",
 	}
 	j.Mem = 100 * 1024 * 1024
 	j.Time = 1000
 	j.TCCount = 1
-	
+
 	js := make(chan JudgeStatus, 10)
-	tc := make(chan struct{ Name string; In string; Out string }, 10)
-	
+	tc := make(chan struct {
+		Name string
+		In   string
+		Out  string
+	}, 10)
+
 	go j.Run(js, tc)
-	
-	tc <- struct{ Name string; In string; Out string }{In: "", Out: "Hello, world\n", Name: "Test01"}
+
+	tc <- struct {
+		Name string
+		In   string
+		Out  string
+	}{In: "", Out: "Hello, world\n", Name: "Test01"}
 	close(tc)
-	
+
 	for c, res := <-js; res; c, res = <-js {
 		var cas, msg string
 		if c.Msg != nil {
 			msg = *c.Msg
-		}else {
+		} else {
 			msg = "<nil>"
 		}
 		if c.Case != nil {
 			cas = *c.Case
-		}else {
+		} else {
 			cas = "<nil>"
 		}
-		fmt.Printf("Case: %s, Msg: %s, Result: %s, Memory: %dKB, Time: %dms\n", cas, msg, JudgeResultToStr[int(c.JR)], c.Mem / 1000, c.Time)
+		fmt.Printf("Case: %s, Msg: %s, Result: %s, Memory: %dKB, Time: %dms\n", cas, msg, JudgeResultToStr[int(c.JR)], c.Mem/1000, c.Time)
 	}
-	
-//	fmt.Println(res.ExitCode, res.Mem, res.Time, res.Status, res.Stdout, res.Stderr)
 
-//	err = exe.Delete()
-/*	err = 
-	if err != nil {
-		fmt.Println(err)
-	}
-*/
+	//	fmt.Println(res.ExitCode, res.Mem, res.Time, res.Status, res.Stdout, res.Stderr)
+
+	//	err = exe.Delete()
+	/*	err =
+		if err != nil {
+			fmt.Println(err)
+		}
+	*/
 	fmt.Println(*wdir, *server)
 }

@@ -7,9 +7,6 @@ import "errors"
 import "time"
 import "fmt"
 import "bytes"
-//import "os"
-//import "strconv"
-//import "os/exec"
 
 type Executor struct {
 	Name string
@@ -186,7 +183,7 @@ func (e *Executor) Run(msTime int64, input string) ExecResult {
 	execTime := <-execTimeChan
 
 	if execTime > msTime {
-        // Kill process in the container
+		// Kill process in the container
 		/*proc, err := cli.ContainerTop(ctx, e.Name, []string{})
 
 				if err == nil {
@@ -216,9 +213,8 @@ func (e *Executor) Run(msTime int64, input string) ExecResult {
 					}
 
 				}*/
-//		exec.Command("docker", "kill", "Hello").Output()
-        
-        cli.ContainerKill(ctx, e.Name, "SIGKILL")
+
+		cli.ContainerKill(ctx, e.Name, "SIGKILL")
 
 		return ExecResult{ExecTimeLimitExceeded, 0, 0, 0, "", ""}
 	}
