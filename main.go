@@ -24,8 +24,6 @@ type SettingsInterface struct {
 	CPUUsage    int    `json:"cpu_usage"`
 }
 
-var wdir string
-
 func printe(err string) {
 	os.Stderr.Write([]byte(err + "\n"))
 }
@@ -95,6 +93,9 @@ func main() {
 			return
 		}
 	}
+	
+	// Copy instances to global ones
+	workingDirectory = *wdir
 
 	headers := map[string]string{"User-Agent": "popcon-judge"}
 
@@ -158,7 +159,6 @@ func main() {
 			cas = "<nil>"
 		}
 		fmt.Println(cas, msg, c.JR, c.Mem, c.Time)
-		
 	}
 	
 //	fmt.Println(res.ExitCode, res.Mem, res.Time, res.Status, res.Stdout, res.Stderr)
