@@ -146,7 +146,19 @@ func main() {
 	tc <- struct{ Name string; In string; Out string }{In: "", Out: "Hello, world!", Name: "Test01"}
 	
 	for c, res := <-js; res; c, res = <-js {
+		var case, msg string
+		if c.Msg != nil {
+			msg = *c.Msg
+		}else {
+			msg = "<nil>"
+		}
+		if c.Case != nil {
+			case = *c.Case
+		}else {
+			case = "<nil>"
+		}
 		fmt.Println(c.Case, c.Msg, c.JR, c.Mem, c.Time)
+		
 	}
 	
 //	fmt.Println(res.ExitCode, res.Mem, res.Time, res.Status, res.Stdout, res.Stderr)
