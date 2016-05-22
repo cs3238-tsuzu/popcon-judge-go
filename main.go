@@ -104,7 +104,7 @@ func main() {
 		panic(err)
 	}
 
-	exe, err := NewExecutor("Hello", 100*1024*1024, []string{"/host_tmp/a.out"}, "ubuntu:16.04", []string{"/tmp:/host_tmp:ro"}, "")
+	/*exe, err := NewExecutor("Hello", 100*1024*1024, []string{"/host_tmp/a.out"}, "ubuntu:16.04", []string{"/tmp:/host_tmp:ro"}, "")
 
 	if err != nil {
 		fmt.Println(err)
@@ -113,8 +113,43 @@ func main() {
 	}
 
 	res := exe.Run(1000, "Hello")
-
-	fmt.Println(res.ExitCode, res.Mem, res.Time, res.Status, res.Stdout, res.Stderr)
+	*/
+	
+	j := Judge{}
+	
+	j.Code = """
+		#include <iostream>
+		
+		int main() {
+			std::cout << "Hello, world" << std::endl;
+		}
+	"""
+	j.Compile = &ExecRequest{
+		Cmd: []string{"g++", "-std=c++14", "-O2", "/work/main.cpp", "-o", "/work/a.out"},
+		Image: "ubuntu-mine:16.04",
+		SourceFileName: "main.cpp"
+	}
+	j.Exec = ExecRequest{
+		Cmd: []string{"/work/a.out"},
+		Image: "ubuntu-mine:16.04",
+		SourceFileName: ""
+	}
+	j.Mem = 100 * 1024 * 1024
+	j.Time = 1000
+	j.TCCount = 1
+	
+	js := make(chan JudgeStatus, 10)
+	tc := make(chan struct{In string; Out string; Name string}, 10)
+	
+	j.Run(res, tc)
+	
+	tc <- struct{In string; Out string; Name string}{In: "", Out: "Hello, world!", Name: "Test01"}
+	
+	for c, res := <-js; res; c, res = <-js {
+		fmt.Println(c.Case, c.Msg, c.JR, c.Mem, c.Time)
+	}
+	
+//	fmt.Println(res.ExitCode, res.Mem, res.Time, res.Status, res.Stdout, res.Stderr)
 
 	err = exe.Delete()
 

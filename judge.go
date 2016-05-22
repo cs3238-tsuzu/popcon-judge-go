@@ -156,7 +156,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 		}
 	}
 	
-	exe, err := NewExecutor(id, j.Mem, j.Exec.Cmd, j.Exec.Image, []string{path + ":" + "/work"}, id)
+	exe, err := NewExecutor(id, j.Mem, j.Exec.Cmd, j.Exec.Image, []string{path + ":" + "/work:ro"}, id)
 	
 	if err != nil {
 		ch <- CreateInternalError("Failed to create a Docker container to judge." + err.Error())
