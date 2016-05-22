@@ -29,8 +29,6 @@ func printe(err string) {
 }
 
 func main() {
-	var settingData SettingsInterface
-
 	help := flag.Bool("help", false, "Display all options")
 	wdir := flag.String("wdir", "/tmp/pj", "A directory to execute programs")
 	server := flag.String("server", "ws://192.168.2.1:8080/", "popcon server address")
