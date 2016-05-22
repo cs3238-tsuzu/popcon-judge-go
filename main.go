@@ -139,11 +139,11 @@ func main() {
 	j.TCCount = 1
 	
 	js := make(chan JudgeStatus, 10)
-	tc := make(chan struct { Name string; In string; Out string }, 10)
+	tc := make(chan struct{ Name string; In string; Out string }, 10)
 	
 	j.Run(js, tc)
 	
-	tc <- struct { Name string; In string; Out string }{In: "", Out: "Hello, world!", Name: "Test01"}
+	tc <- struct{ Name string; In string; Out string }{In: "", Out: "Hello, world!", Name: "Test01"}
 	
 	for c, res := <-js; res; c, res = <-js {
 		fmt.Println(c.Case, c.Msg, c.JR, c.Mem, c.Time)
@@ -151,11 +151,11 @@ func main() {
 	
 //	fmt.Println(res.ExitCode, res.Mem, res.Time, res.Status, res.Stdout, res.Stderr)
 
-	err = exe.Delete()
-
+//	err = exe.Delete()
+/*	err = 
 	if err != nil {
 		fmt.Println(err)
 	}
-
+*/
 	fmt.Println(*wdir, *server)
 }
