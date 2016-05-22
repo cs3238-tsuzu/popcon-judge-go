@@ -127,12 +127,12 @@ func main() {
 	j.Compile = &ExecRequest{
 		Cmd: []string{"g++", "-std=c++14", "-O2", "/work/main.cpp", "-o", "/work/a.out"},
 		Image: "ubuntu-mine:16.04",
-		SourceFileName: "main.cpp"
+		SourceFileName: "main.cpp",
 	}
 	j.Exec = ExecRequest{
 		Cmd: []string{"/work/a.out"},
 		Image: "ubuntu-mine:16.04",
-		SourceFileName: ""
+		SourceFileName: "",
 	}
 	j.Mem = 100 * 1024 * 1024
 	j.Time = 1000
