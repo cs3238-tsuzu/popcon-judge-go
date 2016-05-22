@@ -87,7 +87,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 		return
 	}
 	
-	uid, err = user.Lookup(id)
+	uid, err := user.Lookup(id)
 	
 	if err != nil {
 		ch <- CreateInternalError("Failed to look up a user. " + err.Error())
@@ -111,7 +111,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 	
 	defer os.RemoveAll(path)
 
-	err = os.Chown(path, uidInt, gidInt)
+	err = os.Chown(path, int(uidInt), int(gidInt))
 
 	if err != nil {
 		ch <- CreateInternalError("Failed to chown the directory. " + err.Error())
