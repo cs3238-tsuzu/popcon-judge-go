@@ -96,12 +96,12 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 	}
 	
 	uidInt, err := strconv.ParseInt(uid.Uid, 10, 64)
-	
 	if err != nil {
 		ch <- CreateInternalError("Failed to parseInt uid. " + err.Error())
 		
 		return
 	}
+
 	gidInt, err := strconv.ParseInt(uid.Gid, 10, 64)
 	if err != nil {
 		ch <- CreateInternalError("Failed to parseInt gid. " + err.Error())
@@ -109,6 +109,8 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 		return
 	}
 	
+	fmt.Println(uidInt)
+
 	defer exec.Command("userdel", id)
 	
 	// Working Directory
