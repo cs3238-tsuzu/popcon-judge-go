@@ -91,10 +91,25 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 	
 	if err != nil {
 		ch <- CreateInternalError("Failed to look up a user. " + err.Error())
+		
+		return
 	}
 	
-	uidInt, _ := strconv.ParseInt(uid.Uid, 10, 64)
-	gidInt, _ := strconv.ParseInt(uid.Gid, 10, 64)
+	uidInt, err := strconv.ParseInt(uid.Uid, 10, 64)
+	
+	if err != nil {
+		ch <- CreateInternalError("Failed to parseInt uid. " + err.Error())
+		
+		return
+	}
+	gidInt, err := strconv.ParseInt(uid.Gid, 10, 64)
+	if err != nil {
+		ch <- CreateInternalError("Failed to parseInt gid. " + err.Error())
+		
+		return
+
+	}
+
 	
 	defer exec.Command("userdel", id)
 	
