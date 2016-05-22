@@ -133,6 +133,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 		
 		return
 	}
+	
 	err = os.Chmod(path, 0777)
 	
 	if err != nil {
@@ -140,9 +141,6 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 		
 		return
 	}
-	
-	o, err := exec.Command("ls", "-la", "/tmp/pj").Output()
-	fmt.Println(string(o))
 	
 	// Source File
 	fp, err := os.Create(path + "/" + j.Compile.SourceFileName)
@@ -177,10 +175,9 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 		return
 	}
 
-
 	// Compile
 	if j.Compile != nil {
-		exe, err := NewExecutor(id, 512 * 1024 * 1024, []string{"ls", "-la"}, j.Compile.Image, []string{path + ":" + "/work"}, uid.Uid)
+		exe, err := NewExecutor(id, 512 * 1024 * 1024, j.Compile.Cmd, j.Compile.Image, []string{path + ":" + "/work"}, uid.Uid)
 		
 		if err != nil {
 			ch <- CreateInternalError("Failed to create a Docker container to compile your code." + err.Error())
@@ -208,7 +205,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 			}
 		}
 		
-		if res.ExitCode != 0 || true { // Debug
+		if res.ExitCode != 0 { // Debug
 			msg := res.Stdout + res.Stderr
 			ch <- JudgeStatus{JR: CompileError, Msg: &msg}
 			
