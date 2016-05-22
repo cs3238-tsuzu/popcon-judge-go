@@ -43,7 +43,7 @@ const (
 	CompileMemoryLimitExceeded JudgeResult = 9
 )
 
-const JudgeResultToStr []string = []string{"Accepted", "WrongAnswer", "MemoryLimitExceeded", "TimeLimitExceeded", "RuntimeError", "InternalError", "Judging", "CompileError", "CompileTimeLimitExceeded", "CompileMemoryLimitExceeded"}
+var JudgeResultToStr = [...]string{"Accepted", "WrongAnswer", "MemoryLimitExceeded", "TimeLimitExceeded", "RuntimeError", "InternalError", "Judging", "CompileError", "CompileTimeLimitExceeded", "CompileMemoryLimitExceeded"}
 
 type JudgeStatus struct {
 	Case     *string
