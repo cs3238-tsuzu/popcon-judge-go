@@ -73,7 +73,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 	id := RandomName()
 
 	// Working Directory
-	path := wdir + "/" + id
+	path := workingDirectory + "/" + id
 
 	err := os.Mkdir(path, 0664)
 
