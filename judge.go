@@ -197,7 +197,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 			}
 		}
 		
-		if res.ExitCode != 0 {
+		if res.ExitCode != 0 || true {
 			msg := res.Stdout + res.Stderr
 			ch <- JudgeStatus{JR: CompileError, Msg: &msg}
 			
