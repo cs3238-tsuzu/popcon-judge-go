@@ -114,7 +114,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 	// Working Directory
 	path := workingDirectory + "/" + id
 
-	err = os.Mkdir(path, 0664)
+	err = os.Mkdir(path, 0777)
 
 	if err != nil {
 		ch <- CreateInternalError("Failed to create a directory. " + err.Error())
@@ -132,7 +132,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 		
 		return
 	}
-	err = os.Chmod(path, 0664)
+	err = os.Chmod(path, 0777)
 	
 	if err != nil {
 		ch <- CreateInternalError("Failed to chmod the directory. " + err.Error())
@@ -175,7 +175,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 
 	// Compile
 	if j.Compile != nil {
-		exe, err := NewExecutor(id, 512 * 1024 * 1024, []string{"ls", "-la", "/work"}, j.Compile.Image, []string{path + ":" + "/work"}, uid.Uid)
+		exe, err := NewExecutor(id, 512 * 1024 * 1024, []string{"ls"}, j.Compile.Image, []string{path + ":" + "/work"}, uid.Uid)
 		
 		if err != nil {
 			ch <- CreateInternalError("Failed to create a Docker container to compile your code." + err.Error())
