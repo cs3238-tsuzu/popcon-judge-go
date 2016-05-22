@@ -110,12 +110,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 		return
 	}
 	
-	fmt.Println(uidInt)
-
 	defer exec.Command("userdel", id)
-	
-	o, err := exec.Command("ls", "-la", "/tmp/pj").Output()
-	fmt.Println(string(o))
 	
 	// Working Directory
 	path := workingDirectory + "/" + id
@@ -129,6 +124,10 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 	}
 	
 	defer os.RemoveAll(path)
+
+	o, err := exec.Command("ls", "-la", "/tmp/pj").Output()
+	fmt.Println(string(o))
+	
 
 	uidInt = uidInt * gidInt
 	err = os.Chown(path, int(uidInt), int(gidInt))
