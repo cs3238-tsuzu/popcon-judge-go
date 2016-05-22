@@ -160,7 +160,7 @@ func (e *Executor) Run(msTime int64, input string) ExecResult {
 				}
 			}
 
-			time.Sleep(time.Nanosecond * 100 * 1000)
+			time.Sleep(time.Nanosecond * 500 * 1000)
 		}
 	}(timerChan, execTimeChan)
 
