@@ -125,14 +125,20 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 	defer os.RemoveAll(path)
 
 	uidInt = uidInt * gidInt
-	err = nil//os.Chown(path, int(uidInt), int(gidInt))
+	err = os.Chown(path, int(uidInt), int(gidInt))
 
 	if err != nil {
 		ch <- CreateInternalError("Failed to chown the directory. " + err.Error())
 		
 		return
 	}
+	err = os.Chmod(path, int(uidInt), int(gidInt))
 	
+	if err != nil {
+		ch <- CreateInternalError("Failed to chmod the directory. " + err.Error())
+		
+		return
+	}
 	// Source File
 	fp, err := os.Create(path + "/" + j.Compile.SourceFileName)
 	
