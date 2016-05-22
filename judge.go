@@ -169,7 +169,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 
 	// Compile
 	if j.Compile != nil {
-		exe, err := NewExecutor(id, 512 * 1024 * 1024, []string{"ls", "-la", "/"}, j.Compile.Image, []string{path + ":" + "/work"}, uid.Uid)
+		exe, err := NewExecutor(id, 512 * 1024 * 1024, []string{"whoami"}, j.Compile.Image, []string{path + ":" + "/work"}, uid.Uid)
 		
 		if err != nil {
 			ch <- CreateInternalError("Failed to create a Docker container to compile your code." + err.Error())
@@ -197,7 +197,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 			}
 		}
 		
-		if res.ExitCode != 0 || true {
+		if res.ExitCode != 0 || true { // Debug
 			msg := res.Stdout + res.Stderr
 			ch <- JudgeStatus{JR: CompileError, Msg: &msg}
 			
