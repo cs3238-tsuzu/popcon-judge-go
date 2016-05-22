@@ -8,6 +8,7 @@ import "strconv"
 import "github.com/seehuhn/mt19937"
 import "time"
 import "os/user"
+import "fmt"
 
 var cli *client.Client
 
@@ -211,6 +212,8 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 			return
 		}
 	}
+	
+	fmt.Println("Finished compiling")
 	exe, err := NewExecutor(id, j.Mem, j.Exec.Cmd, j.Exec.Image, []string{path + ":" + "/work:ro"}, uid.Uid)
 	
 	if err != nil {
