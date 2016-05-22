@@ -180,7 +180,7 @@ func (e *Executor) Run(msTime int64, input string) ExecResult {
 	if err != nil {
 		timerChan <- false
 
-		return ExecResult{ExecError, 0, 0, 0, "", "Failed to start a container"}
+		return ExecResult{ExecError, 0, 0, 0, "", "Failed to start a container. " + err.Error()}
 	}
 
 	execTime := <-execTimeChan

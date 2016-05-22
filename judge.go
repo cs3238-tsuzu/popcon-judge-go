@@ -5,7 +5,6 @@ import "github.com/docker/engine-api/client"
 import "math/rand"
 import "os/exec"
 import "strconv"
-import "fmt"
 import "github.com/seehuhn/mt19937"
 import "time"
 
@@ -80,8 +79,6 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 
 	// Working Directory
 	path := workingDirectory + "/" + id
-
-	fmt.Println(path)
 
 	err := os.Mkdir(path, 0664)
 
