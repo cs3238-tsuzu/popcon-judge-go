@@ -79,7 +79,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 	id := RandomName()
 	
 	// User
-	_, err = exec.Command("useradd", "--no-create-home", id).Output()
+	_, err := exec.Command("useradd", "--no-create-home", id).Output()
 	
 	if err != nil {
 		ch <- CreateInternalError("Failed to create a directory to build your code. " + err.Error())
@@ -87,18 +87,21 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 		return
 	}
 	
-	uid, err := user.Lookup(id)
+	uid, err = user.Lookup(id)
 	
 	if err != nil {
 		ch <- CreateInternalError("Failed to look up a user. " + err.Error())
 	}
+	
+	uidInt, _ := strconv.ParseInt(uid.Uid, 10, 64)
+	gidInt, _ := strconv.ParseInt(uid.Gid, 10, 64)
 	
 	defer exec.Command("userdel", id)
 	
 	// Working Directory
 	path := workingDirectory + "/" + id
 
-	err := os.Mkdir(path, 0664)
+	err = os.Mkdir(path, 0664)
 
 	if err != nil {
 		ch <- CreateInternalError("Failed to create a directory. " + err.Error())
@@ -108,7 +111,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 	
 	defer os.RemoveAll(path)
 
-	err = os.Chown(path, uid.Uid, uid.Gid)
+	err = os.Chown(path, uidInt, gidInt)
 
 	if err != nil {
 		ch <- CreateInternalError("Failed to chown the directory. " + err.Error())
