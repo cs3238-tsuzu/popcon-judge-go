@@ -1,3 +1,5 @@
 popcon-judge
-.DS_Store
+deploy.sh
 vendor/
+.DS_Store
+.vscode/

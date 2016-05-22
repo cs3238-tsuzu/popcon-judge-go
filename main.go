@@ -24,8 +24,6 @@ type SettingsInterface struct {
 	CPUUsage    int    `json:"cpu_usage"`
 }
 
-var wdir string
-
 func printe(err string) {
 	os.Stderr.Write([]byte(err + "\n"))
 }
@@ -95,6 +93,9 @@ func main() {
 			return
 		}
 	}
+	
+	// Copy instances to global ones
+	workingDirectory = *wdir
 
 	headers := map[string]string{"User-Agent": "popcon-judge"}
 
@@ -104,7 +105,7 @@ func main() {
 		panic(err)
 	}
 
-	exe, err := NewExecutor("Hello", 100*1024*1024, []string{"/host_tmp/a.out"}, "ubuntu:16.04", []string{"/tmp:/host_tmp:ro"}, "")
+	/*exe, err := NewExecutor("Hello", 100*1024*1024, []string{"/host_tmp/a.out"}, "ubuntu:16.04", []string{"/tmp:/host_tmp:ro"}, "")
 
 	if err != nil {
 		fmt.Println(err)
@@ -113,14 +114,61 @@ func main() {
 	}
 
 	res := exe.Run(1000, "Hello")
+	*/
+	
+	j := Judge{}
+	
+	j.Code = `
+		#include <iostream>
+		
+		int main() {
+			std::cout << "Hello, world" << std::endl;
+		}
+	`
+	j.Compile = &ExecRequest{
+		Cmd: []string{"g++", "-std=c++14", "-O2", "/work/main.cpp", "-o", "/work/a.out"},
+		Image: "ubuntu-mine:16.04",
+		SourceFileName: "main.cpp",
+	}
+	j.Exec = ExecRequest{
+		Cmd: []string{"/work/a.out"},
+		Image: "ubuntu-mine:16.04",
+		SourceFileName: "",
+	}
+	j.Mem = 100 * 1024 * 1024
+	j.Time = 1000
+	j.TCCount = 1
+	
+	js := make(chan JudgeStatus, 10)
+	tc := make(chan struct{ Name string; In string; Out string }, 10)
+	
+	go j.Run(js, tc)
+	
+	tc <- struct{ Name string; In string; Out string }{In: "", Out: "Hello, world\n", Name: "Test01"}
+	close(tc)
+	
+	for c, res := <-js; res; c, res = <-js {
+		var cas, msg string
+		if c.Msg != nil {
+			msg = *c.Msg
+		}else {
+			msg = "<nil>"
+		}
+		if c.Case != nil {
+			cas = *c.Case
+		}else {
+			cas = "<nil>"
+		}
+		fmt.Printf("Case: %s, Msg: %s, Result: %s, Memory: %dKB, Time: %dms\n", cas, msg, JudgeResultToStr[int(c.JR)], c.Mem / 1000, c.Time)
+	}
+	
+//	fmt.Println(res.ExitCode, res.Mem, res.Time, res.Status, res.Stdout, res.Stderr)
 
-	fmt.Println(res.ExitCode, res.Mem, res.Time, res.Status, res.Stdout, res.Stderr)
-
-	err = exe.Delete()
-
+//	err = exe.Delete()
+/*	err = 
 	if err != nil {
 		fmt.Println(err)
 	}
-
+*/
 	fmt.Println(*wdir, *server)
 }
