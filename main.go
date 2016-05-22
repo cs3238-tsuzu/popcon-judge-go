@@ -122,14 +122,14 @@ func main() {
 		int main() {
 			long long ll = 0;
 			
-			for(int i = 0; i < 100000000; ++i) {
+			for(int i = 0; i < 200000000; ++i) {
 				ll += i;
 			}
 			std::cout << "Hello, world" << std::endl;
 		}
 	`
 	j.Compile = &ExecRequest{
-		Cmd:            []string{"g++", "-std=c++14", "-O2", "/work/main.cpp", "-o", "/work/a.out"},
+		Cmd:            []string{"g++", "-std=c++14", "/work/main.cpp", "-o", "/work/a.out"},
 		Image:          "ubuntu-mine:16.04",
 		SourceFileName: "main.cpp",
 	}
