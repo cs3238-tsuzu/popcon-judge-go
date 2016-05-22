@@ -7,6 +7,7 @@ import "os/exec"
 import "strconv"
 import "github.com/seehuhn/mt19937"
 import "time"
+import "os/user"
 
 var cli *client.Client
 
@@ -121,11 +122,17 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 		return
 	}
 	
+	uid, err := user.Lookup(id)
+	
+	if err != nil {
+		ch <- CreateInternalError("Failed to look up a user." + err.Error())
+	}
+	
 	defer exec.Command("userdel", id)
 	
 	// Compile
 	if j.Compile != nil {
-		exe, err := NewExecutor(id, 512 * 1024 * 1024, j.Compile.Cmd, j.Compile.Image, []string{path + ":" + "/work"}, id)
+		exe, err := NewExecutor(id, 512 * 1024 * 1024, j.Compile.Cmd, j.Compile.Image, []string{path + ":" + "/work"}, uid.Uid)
 		
 		if err != nil {
 			ch <- CreateInternalError("Failed to create a Docker container to compile your code." + err.Error())
@@ -161,7 +168,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 		}
 	}
 	
-	exe, err := NewExecutor(id, j.Mem, j.Exec.Cmd, j.Exec.Image, []string{path + ":" + "/work:ro"}, id)
+	exe, err := NewExecutor(id, j.Mem, j.Exec.Cmd, j.Exec.Image, []string{path + ":" + "/work:ro"}, uid.Uid)
 	
 	if err != nil {
 		ch <- CreateInternalError("Failed to create a Docker container to judge." + err.Error())
