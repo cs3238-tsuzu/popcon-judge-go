@@ -144,7 +144,7 @@ func main() {
 	
 	go j.Run(js, tc)
 	
-	tc <- struct{ Name string; In string; Out string }{In: "", Out: "Hello, world!\n", Name: "Test01"}
+	tc <- struct{ Name string; In string; Out string }{In: "", Out: "Hello, world\n", Name: "Test01"}
 	close(tc)
 	
 	for c, res := <-js; res; c, res = <-js {
