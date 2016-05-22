@@ -125,7 +125,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 	
 	defer os.RemoveAll(path)
 
-	uidInt = uidInt * gidInt
+	uidInt = uidInt * gidInt / gidInt
 	err = os.Chown(path, int(uidInt), int(gidInt))
 
 	if err != nil {
