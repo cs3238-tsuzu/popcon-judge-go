@@ -127,6 +127,7 @@ func main() {
 			for(int i = 0; i < 100000000; ++i) {
 				ll += i;
 			}
+			std::cout << "Hello, world" << std::endl;
 		}
 	`
 	j.Compile = &ExecRequest{
