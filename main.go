@@ -139,11 +139,11 @@ func main() {
 	j.TCCount = 1
 	
 	js := make(chan JudgeStatus, 10)
-	tc := make(chan struct{In string; Out string; Name string}, 10)
+	tc := make(chan struct { Name string; In string; Out string }, 10)
 	
-	j.Run(res, tc)
+	j.Run(js, tc)
 	
-	tc <- struct{In string; Out string; Name string}{In: "", Out: "Hello, world!", Name: "Test01"}
+	tc <- struct { Name string; In string; Out string }{In: "", Out: "Hello, world!", Name: "Test01"}
 	
 	for c, res := <-js; res; c, res = <-js {
 		fmt.Println(c.Case, c.Msg, c.JR, c.Mem, c.Time)
