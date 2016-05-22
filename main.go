@@ -142,7 +142,7 @@ func main() {
 	js := make(chan JudgeStatus, 10)
 	tc := make(chan struct{ Name string; In string; Out string }, 10)
 	
-	j.Run(js, tc)
+	go j.Run(js, tc)
 	
 	tc <- struct{ Name string; In string; Out string }{In: "", Out: "Hello, world!\n", Name: "Test01"}
 	close(tc)

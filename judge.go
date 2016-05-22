@@ -228,6 +228,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 	fmt.Println("Finished creating")
 	
 	tcCounter := 0
+	
 	for tc, res := <-tests; res; tc, res = <-tests {
 		fmt.Println("A")
 		res := exe.Run(j.Time, tc.In)
