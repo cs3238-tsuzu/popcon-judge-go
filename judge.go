@@ -7,6 +7,7 @@ import "os/exec"
 import "strconv"
 import "fmt"
 import "github.com/seehuhn/mt19937"
+import "time"
 
 var cli *client.Client
 
