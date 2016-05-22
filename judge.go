@@ -125,10 +125,6 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 	
 	defer os.RemoveAll(path)
 
-	o, err := exec.Command("ls", "-la", "/tmp/pj").Output()
-	fmt.Println(string(o))
-	
-
 	uidInt = uidInt * gidInt
 	err = os.Chown(path, int(uidInt), int(gidInt))
 
@@ -144,6 +140,10 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 		
 		return
 	}
+	
+	o, err := exec.Command("ls", "-la", "/tmp/pj").Output()
+	fmt.Println(string(o))
+	
 	// Source File
 	fp, err := os.Create(path + "/" + j.Compile.SourceFileName)
 	
@@ -215,7 +215,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 			return
 		}
 	}
-	return
+	return // Debug
 	
 	exe, err := NewExecutor(id, j.Mem, j.Exec.Cmd, j.Exec.Image, []string{path + ":" + "/work:ro"}, uid.Uid)
 	
