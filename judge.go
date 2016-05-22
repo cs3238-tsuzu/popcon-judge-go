@@ -9,6 +9,7 @@ import "github.com/seehuhn/mt19937"
 import "time"
 import "os/user"
 import "fmt"
+import "math"
 
 var cli *client.Client
 
@@ -32,15 +33,17 @@ type JudgeResult int
 const (
 	Accepted            JudgeResult = 0
 	WrongAnswer         JudgeResult = 1
-	CompileError        JudgeResult = 2
+	MemoryLimitExceeded        JudgeResult = 2
 	TimeLimitExceeded   JudgeResult = 3
-	MemoryLimitExceeded JudgeResult = 4
-	RuntimeError        JudgeResult = 5
-	InternalError       JudgeResult = 6
-	Judging             JudgeResult = 7
+	RuntimeError JudgeResult = 4
+	InternalError        JudgeResult = 5
+	Judging       JudgeResult = 6
+	CompileError             JudgeResult = 7
 	CompileTimeLimitExceeded JudgeResult = 8
 	CompileMemoryLimitExceeded JudgeResult = 9
 )
+
+const JudgeResultToStr []string = []string{"Accepted", "WrongAnswer", "MemoryLimitExceeded", "TimeLimitExceeded", "RuntimeError", "InternalError", "Judging", "CompileError", "CompileTimeLimitExceeded", "CompileMemoryLimitExceeded"}
 
 type JudgeStatus struct {
 	Case     *string
@@ -213,8 +216,6 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 		}
 	}
 	
-	fmt.Println("Finished compiling")
-	
 	exe, err := NewExecutor(id, j.Mem, j.Exec.Cmd, j.Exec.Image, []string{path + ":" + "/work:ro"}, uid.Uid)
 	
 	if err != nil {
@@ -225,41 +226,78 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 	
 	defer exe.Delete()
 	
-	fmt.Println("Finished creating")
-	
 	tcCounter := 0
 	
+	totalResult := 0
+	maxInt := func(a int, b int) int {
+		if a > b {
+			return a
+		}else {
+			return b
+		}
+	}
+	maxInt64 := func(a int64, b int64) int64 {
+		if a > b {
+			return a
+		}else {
+			return b
+		}
+	}
+	
+	var maxTime, maxMem int64
 	for tc, res := <-tests; res; tc, res = <-tests {
-		fmt.Println("A")
+		tcCounter++
+		
+		msg := strconv.FormatInt(int64(tcCounter), 10) + "/" + strconv.FormatInt(int64(j.TCCount), 10)
+		ch <- JudgeStatus{JR: Judging, Msg: &msg}
+		
+		r := Accepted
 		res := exe.Run(j.Time, tc.In)
-		fmt.Println("B")
 		
 		if res.Status != ExecFinished {
 			switch res.Status {
 			case ExecError:
 				msg := "Failed to execute your code." + res.Stderr
 				ch <- JudgeStatus{Case: &tc.Name, JR: InternalError, Msg: &msg}
+				r = InternalError
+				maxMem = -1
+				maxTime = -1
 			case ExecMemoryLimitExceeded:
 				ch <- JudgeStatus{Case: &tc.Name, JR: MemoryLimitExceeded}
+				r = MemoryLimitExceeded
+				maxMem = -1
+				maxTime = -1
 			case ExecTimeLimitExceeded:
 				ch <- JudgeStatus{Case: &tc.Name, JR: TimeLimitExceeded}
+				r = InternalError
+				maxMem = -1
+				maxTime = -1
 			}
 		}else {
 			if res.ExitCode != 0 {
 				ch <- JudgeStatus{Case: &tc.Name, JR: RuntimeError}
+				r = RuntimeError
+				maxMem = -1
+				maxTime = -1
 			}else {
 				if res.Stdout == tc.Out {
-					ch <- JudgeStatus{Case: &tc.Name, JR: Accepted}
+					ch <- JudgeStatus{Case: &tc.Name, JR: Accepted, Mem: res.Mem, Time: res.Time}
+					r = Accepted
 				}else {
-					ch <- JudgeStatus{Case: &tc.Name, JR: WrongAnswer}
+					ch <- JudgeStatus{Case: &tc.Name, JR: WrongAnswer, Mem: res.Mem, Time: res.Time}
+					r = WrongAnswer
+				}
+				if maxMem != -1 {
+					maxMem = maxInt64(maxMem, res.Mem)
+				}
+				if maxTime != -1 {
+					maxTime = maxInt64(maxTime, res.Time)
 				}
 			}
 		}
 		
-		tcCounter++
-		
-		msg := strconv.FormatInt(int64(tcCounter), 10) + "/" + strconv.FormatInt(int64(j.TCCount), 10)
-		ch <- JudgeStatus{JR: Judging, Msg: &msg}
+		totalResult = maxInt(totalResult, int(r))
 	}
 	
+	ch <- JudgeStatus{JR: JudgeResult(totalResult), Time: maxTime, Mem: maxMem}
 }
