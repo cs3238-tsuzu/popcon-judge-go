@@ -280,11 +280,12 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 				maxTime = -1
 			}else {
 				fmt.Println(tc.Name)
+				name := tc.Name
 				if res.Stdout == tc.Out {
-					ch <- JudgeStatus{Case: &tc.Name, JR: Accepted, Mem: res.Mem, Time: res.Time}
+					ch <- JudgeStatus{Case: &name, JR: Accepted, Mem: res.Mem, Time: res.Time}
 					r = Accepted
 				}else {
-					ch <- JudgeStatus{Case: &tc.Name, JR: WrongAnswer, Mem: res.Mem, Time: res.Time}
+					ch <- JudgeStatus{Case: &name, JR: WrongAnswer, Mem: res.Mem, Time: res.Time}
 					r = WrongAnswer
 				}
 				if maxMem != -1 {
