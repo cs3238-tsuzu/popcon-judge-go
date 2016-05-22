@@ -117,13 +117,13 @@ func main() {
 	
 	j := Judge{}
 	
-	j.Code = """
+	j.Code = `
 		#include <iostream>
 		
 		int main() {
 			std::cout << "Hello, world" << std::endl;
 		}
-	"""
+	`
 	j.Compile = &ExecRequest{
 		Cmd: []string{"g++", "-std=c++14", "-O2", "/work/main.cpp", "-o", "/work/a.out"},
 		Image: "ubuntu-mine:16.04",
