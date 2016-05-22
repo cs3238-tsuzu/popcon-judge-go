@@ -5,7 +5,6 @@ import "github.com/docker/engine-api/types/container"
 import "golang.org/x/net/context"
 import "errors"
 import "time"
-import "fmt"
 import "bytes"
 
 type Executor struct {
@@ -152,7 +151,6 @@ func (e *Executor) Run(msTime int64, input string) ExecResult {
 
 							t := time.Now().UnixNano()/int64(time.Millisecond) - start
 							if t > msTime {
-								fmt.Println("Timed out")
 								result <- t
 
 								return
