@@ -114,6 +114,9 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 
 	defer exec.Command("userdel", id)
 	
+	o, err := exec.Command("ls", "-la", "/tmp/pj").Output()
+	fmt.Println(string(o))
+	
 	// Working Directory
 	path := workingDirectory + "/" + id
 
