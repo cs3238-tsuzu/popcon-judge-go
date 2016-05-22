@@ -124,7 +124,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 	
 	defer os.RemoveAll(path)
 
-	uidInt = uidInt *gidInt
+	uidInt = uidInt * gidInt
 	err = nil//os.Chown(path, int(uidInt), int(gidInt))
 
 	if err != nil {
@@ -169,7 +169,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 
 	// Compile
 	if j.Compile != nil {
-		exe, err := NewExecutor(id, 512 * 1024 * 1024, []string{"ls", "-la", "/work"}, j.Compile.Image, []string{path + ":" + "/work"}, uid.Uid)
+		exe, err := NewExecutor(id, 512 * 1024 * 1024, []string{"ls", "-la", "/"}, j.Compile.Image, []string{path + ":" + "/work"}, uid.Uid)
 		
 		if err != nil {
 			ch <- CreateInternalError("Failed to create a Docker container to compile your code." + err.Error())
