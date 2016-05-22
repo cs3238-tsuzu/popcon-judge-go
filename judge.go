@@ -110,7 +110,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 		return
 	}
 	
-	defer exec.Command("userdel", id)
+	defer exec.Command("userdel", id).Output()
 	
 	// Working Directory
 	path := workingDirectory + "/" + id
@@ -214,6 +214,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 	}
 	
 	fmt.Println("Finished compiling")
+	
 	exe, err := NewExecutor(id, j.Mem, j.Exec.Cmd, j.Exec.Image, []string{path + ":" + "/work:ro"}, uid.Uid)
 	
 	if err != nil {
