@@ -6,6 +6,7 @@ import "math/rand"
 import "os/exec"
 import "strconv"
 import "fmt"
+import "github.com/seehuhn/mt19937"
 
 var cli *client.Client
 
@@ -54,9 +55,12 @@ func CreateInternalError(msg string) JudgeStatus {
 const BASE_RAND_STRING = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 func RandomName() string {
+	rng := rand.New(mt19937.New())
+	rng.Seed(time.Now().UnixNano())
+	
 	res := make([]byte, 0, 32)
 	for i := 0; i < 32; i++ {
-		res = append(res, BASE_RAND_STRING[rand.Intn(len(BASE_RAND_STRING))])
+		res = append(res, BASE_RAND_STRING[rng.Intn(len(BASE_RAND_STRING))])
 	}
 	
 	return string(res)

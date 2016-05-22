@@ -114,6 +114,10 @@
 			"Rev": "d49ece5a83da3dcb820121d6850e2b61bd0a5fbe"
 		},
 		{
+			"ImportPath": "github.com/seehuhn/mt19937",
+			"Rev": "98c0ea580d2f3c5a171acf4d4f15321b72209d08"
+		},
+		{
 			"ImportPath": "golang.org/x/net/context",
 			"Rev": "2a35e686583654a1b89ca79c4ac78cb3d6529ca3"
 		},
