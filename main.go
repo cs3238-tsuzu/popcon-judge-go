@@ -139,7 +139,7 @@ func main() {
 		SourceFileName: "",
 	}
 	j.Mem = 100 * 1024 * 1024
-	j.Time = 1000
+	j.Time = 2000
 	j.TCCount = 1
 
 	js := make(chan JudgeStatus, 10)
