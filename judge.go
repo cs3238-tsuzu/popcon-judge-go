@@ -5,6 +5,7 @@ import "github.com/docker/engine-api/client"
 import "math/rand"
 import "os/exec"
 import "strconv"
+import "fmt"
 
 var cli *client.Client
 
