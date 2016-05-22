@@ -251,34 +251,34 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 
 		r := Accepted
 		res := exe.Run(j.Time, tc.In)
-
+		
+		name := tc.Name
 		if res.Status != ExecFinished {
 			switch res.Status {
 			case ExecError:
 				msg := "Failed to execute your code." + res.Stderr
-				ch <- JudgeStatus{Case: &tc.Name, JR: InternalError, Msg: &msg}
+				ch <- JudgeStatus{Case: &name, JR: InternalError, Msg: &msg}
 				r = InternalError
 				maxMem = -1
 				maxTime = -1
 			case ExecMemoryLimitExceeded:
-				ch <- JudgeStatus{Case: &tc.Name, JR: MemoryLimitExceeded}
+				ch <- JudgeStatus{Case: &name, JR: MemoryLimitExceeded}
 				r = MemoryLimitExceeded
 				maxMem = -1
 				maxTime = -1
 			case ExecTimeLimitExceeded:
-				ch <- JudgeStatus{Case: &tc.Name, JR: TimeLimitExceeded}
+				ch <- JudgeStatus{Case: &name, JR: TimeLimitExceeded}
 				r = InternalError
 				maxMem = -1
 				maxTime = -1
 			}
 		} else {
 			if res.ExitCode != 0 {
-				ch <- JudgeStatus{Case: &tc.Name, JR: RuntimeError}
+				ch <- JudgeStatus{Case: &name, JR: RuntimeError}
 				r = RuntimeError
 				maxMem = -1
 				maxTime = -1
 			} else {
-				name := tc.Name
 				if res.Stdout == tc.Out {
 					ch <- JudgeStatus{Case: &name, JR: Accepted, Mem: res.Mem, Time: res.Time}
 					r = Accepted

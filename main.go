@@ -122,8 +122,10 @@ func main() {
 		#include <iostream>
 		
 		int main() {
-			while(true) {
-				
+			long long ll = 0;
+			
+			for(int i = 0; i < 100000000; ++i) {
+				ll += i;
 			}
 		}
 	`
@@ -138,7 +140,7 @@ func main() {
 		SourceFileName: "",
 	}
 	j.Mem = 100 * 1024 * 1024
-	j.Time = 10000
+	j.Time = 1000
 	j.TCCount = 1
 
 	js := make(chan JudgeStatus, 10)
