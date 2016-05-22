@@ -298,6 +298,7 @@ func NewExecutor(name string, mem int64, cmd []string, img string, binds []strin
 
 	hcfg := container.HostConfig{}
 
+	hcfg.CPUPercent
 	hcfg.NetworkMode = "none"
 	hcfg.Binds = binds
 	hcfg.CgroupParent = "/" + name

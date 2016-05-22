@@ -122,7 +122,9 @@ func main() {
 		#include <iostream>
 		
 		int main() {
-			std::cout << "Hello, world" << std::endl;
+			while(true) {
+				
+			}
 		}
 	`
 	j.Compile = &ExecRequest{
@@ -136,7 +138,7 @@ func main() {
 		SourceFileName: "",
 	}
 	j.Mem = 100 * 1024 * 1024
-	j.Time = 1000
+	j.Time = 10000
 	j.TCCount = 1
 
 	js := make(chan JudgeStatus, 10)
