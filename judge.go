@@ -77,20 +77,46 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 	
 	// Identity
 	id := RandomName()
-
+	
+	// User
+	_, err = exec.Command("useradd", "--no-create-home", id).Output()
+	
+	if err != nil {
+		ch <- CreateInternalError("Failed to create a directory to build your code. " + err.Error())
+		
+		return
+	}
+	
+	uid, err := user.Lookup(id)
+	
+	if err != nil {
+		ch <- CreateInternalError("Failed to look up a user. " + err.Error())
+	}
+	
+	defer exec.Command("userdel", id)
+	
 	// Working Directory
 	path := workingDirectory + "/" + id
 
 	err := os.Mkdir(path, 0664)
 
 	if err != nil {
-		ch <- CreateInternalError("Failed to create a directory." + err.Error())
+		ch <- CreateInternalError("Failed to create a directory. " + err.Error())
 
 		return
 	}
 	
 	defer os.RemoveAll(path)
+
+	err = os.Chown(path, uid.Uid, uid.Gid)
+
+	if err != nil {
+		ch <- CreateInternalError("Failed to chown the directory. " + err.Error())
+		
+		return
+	}
 	
+	// Source File
 	fp, err := os.Create(path + "/" + j.Compile.SourceFileName)
 	
 	if err != nil {
@@ -102,34 +128,28 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 	l, err := fp.Write([]byte(j.Code))
 	
 	if err != nil {
-		ch <- CreateInternalError("Failed to write your code on your file." + err.Error())
+		ch <- CreateInternalError("Failed to write your code on your file. " + err.Error())
 
 		return
 	}
-
+	
 	if l != len(j.Code) {
 		ch <- CreateInternalError("Failed to write your code on your file.")
 
 		return
 	}
 	
-	// User
-	_, err = exec.Command("useradd", "--no-create-home", id).Output()
+	fp.Close()
+
+	err = os.Chmod(path + "/" + j.Compile.SourceFileName, 0644)
 	
 	if err != nil {
-		ch <- CreateInternalError("Failed to create a directory to build your code." + err.Error())
-		
+		ch <- CreateInternalError("Failed to chmod the source file. " + err.Error())
+
 		return
 	}
-	
-	uid, err := user.Lookup(id)
-	
-	if err != nil {
-		ch <- CreateInternalError("Failed to look up a user." + err.Error())
-	}
-	
-	defer exec.Command("userdel", id)
-	
+
+
 	// Compile
 	if j.Compile != nil {
 		exe, err := NewExecutor(id, 512 * 1024 * 1024, j.Compile.Cmd, j.Compile.Image, []string{path + ":" + "/work"}, uid.Uid)
