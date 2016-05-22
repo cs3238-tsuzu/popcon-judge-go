@@ -296,7 +296,7 @@ func NewExecutor(name string, mem int64, cmd []string, img string, binds []strin
 
 	hcfg := container.HostConfig{}
 
-	hcfg.CPUQuota = 1000 * settingData.CPUUsage
+	hcfg.CPUQuota = int64(1000 * settingData.CPUUsage)
 	hcfg.CPUPeriod = 100000
 	hcfg.NetworkMode = "none"
 	hcfg.Binds = binds
