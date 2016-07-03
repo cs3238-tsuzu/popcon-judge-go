@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/docker/engine-api/client"
+	"log"
 )
 
 // SettingsTemplate is a template of a setting json
@@ -22,10 +23,6 @@ type SettingsInterface struct {
 	Name        string `json:"name"`
 	Parallelism int    `json:"parallelism"`
 	CPUUsage    int    `json:"cpu_usage"`
-}
-
-func printe(err string) {
-	os.Stderr.Write([]byte(err + "\n"))
 }
 
 func main() {
@@ -45,7 +42,7 @@ func main() {
 	err := os.MkdirAll(*wdir, 0664)
 
 	if err != nil {
-		printe(err.Error())
+		log.Println(err.Error())
 
 		os.Exit(1)
 
@@ -53,12 +50,12 @@ func main() {
 	}
 
 	if _, err = os.Stat(*settings); err != nil {
-		printe(err.Error())
+		log.Println(err.Error())
 
 		if fp, err := os.OpenFile(*settings, os.O_RDWR|os.O_CREATE, 0664); err != nil {
-			printe("failed to create a setting file at '" + *settings + "'")
+			log.Println("failed to create a setting file at '" + *settings + "'")
 		} else {
-			printe("created a setting file at '" + *settings + "'")
+			log.Println("created a setting file at '" + *settings + "'")
 
 			fp.Write([]byte(SettingsTemplate))
 
@@ -72,7 +69,7 @@ func main() {
 		fp, err := os.OpenFile(*settings, os.O_RDONLY, 0664)
 
 		if err != nil {
-			printe(err.Error())
+			log.Println(err.Error())
 
 			os.Exit(1)
 
@@ -84,7 +81,7 @@ func main() {
 		err = dec.Decode(&settingData)
 
 		if err != nil {
-			printe("Failed to decode a json: " + err.Error())
+			log.Println("Failed to decode a json: " + err.Error())
 
 			os.Exit(1)
 
@@ -140,37 +137,33 @@ func main() {
 	}
 	j.Mem = 100 * 1024 * 1024
 	j.Time = 2000
-	j.TCCount = 1
 
 	js := make(chan JudgeStatus, 10)
-	tc := make(chan struct {
-		Name string
-		In   string
-		Out  string
-	}, 10)
+	tc := make(chan TCType, 10)
 
 	go j.Run(js, tc)
 
-	tc <- struct {
-		Name string
-		In   string
-		Out  string
-	}{In: "", Out: "Hello, world\n", Name: "Test01"}
+	tc <- TCType{In: "", Name: "Test01"}
 	close(tc)
 
 	for c, res := <-js; res; c, res = <-js {
-		var cas, msg string
-		if c.Msg != nil {
-			msg = *c.Msg
+		var cas, stdout, stderr string
+		if c.Stdout != nil {
+			stdout = *c.Stdout
 		} else {
-			msg = "<nil>"
+			stdout = "<nil>"
+		}
+		if c.Stderr != nil {
+			stderr = *c.Stderr
+		} else {
+			stderr = "<nil>"
 		}
 		if c.Case != nil {
 			cas = *c.Case
 		} else {
 			cas = "<nil>"
 		}
-		fmt.Printf("Case: %s, Msg: %s, Result: %s, Memory: %dKB, Time: %dms\n", cas, msg, JudgeResultToStr[int(c.JR)], c.Mem/1000, c.Time)
+		fmt.Printf("Case: %s, Stdout: %s, Stderr: %s, Result: %s, Memory: %dKB, Time: %dms\n", cas, stdout, stderr, JudgeResultToStr[int(c.JR)], c.Mem/1000, c.Time)
 	}
 
 	//	fmt.Println(res.ExitCode, res.Mem, res.Time, res.Status, res.Stdout, res.Stderr)

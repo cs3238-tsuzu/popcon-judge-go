@@ -4,12 +4,15 @@ import "github.com/docker/engine-api/types"
 import "github.com/docker/engine-api/types/container"
 import "golang.org/x/net/context"
 import "errors"
-import "time"
 import "bytes"
+import "strconv"
+import "strings"
+import "archive/tar"
 
 type Executor struct {
 	Name string
 	Mem  int64
+	Time int64
 	Cgr  Cgroup
 }
 
@@ -31,7 +34,7 @@ type ExecResult struct {
 	Stderr   string
 }
 
-func (e *Executor) Run(msTime int64, input string) ExecResult {
+func (e *Executor) Run(input string) ExecResult {
 	cg := e.Cgr
 	memc := cg.getSubsys("memory")
 
@@ -103,67 +106,6 @@ func (e *Executor) Run(msTime int64, input string) ExecResult {
 	go attachment(types.ContainerAttachOptions{Stream: true, Stderr: true}, stderrErr, &stderr)
 	go attachment(types.ContainerAttachOptions{Stream: true, Stdin: true}, stdinErr, nil)
 
-	timerChan := make(chan bool, 1)
-	execTimeChan := make(chan int64, 1)
-
-	go func(done <-chan bool, result chan<- int64) {
-		var start int64 = 0
-		var chil string
-
-		for {
-			select {
-			case <-done:
-				if start == 0 {
-					result <- 1
-				} else {
-					result <- time.Now().UnixNano()/int64(time.Millisecond) - start
-				}
-				break
-			default:
-			}
-
-			if chil == "" {
-				list, _ := memc.listChildren()
-
-				if len(list) != 0 {
-					chil = list[0]
-				}
-			} else {
-				val, err := memc.getVal(chil + "/tasks")
-
-				if err != nil {
-					if start == 0 {
-						result <- 1
-					} else {
-						result <- time.Now().UnixNano()/int64(time.Millisecond) - start
-					}
-				} else {
-					if start == 0 {
-						if len(*val) != 0 {
-							start = time.Now().UnixNano() / int64(time.Millisecond)
-						}
-					} else {
-						if len(*val) == 0 {
-							result <- time.Now().UnixNano()/int64(time.Millisecond) - start
-
-							return
-						} else {
-
-							t := time.Now().UnixNano()/int64(time.Millisecond) - start
-							if t > msTime {
-								result <- t
-
-								return
-							}
-						}
-					}
-				}
-			}
-
-			time.Sleep(time.Nanosecond * 500 * 1000)
-		}
-	}(timerChan, execTimeChan)
-
 	<-stdinErr
 	<-stdoutErr
 	<-stderrErr
@@ -173,64 +115,59 @@ func (e *Executor) Run(msTime int64, input string) ExecResult {
 	err := cli.ContainerStart(ctx, e.Name)
 
 	if err != nil {
-		timerChan <- false
-
 		return ExecResult{ExecError, 0, 0, 0, "", "Failed to start a container. " + err.Error()}
-	}
-
-	execTime := <-execTimeChan
-
-	if execTime > msTime {
-		// Kill process in the container
-		/*proc, err := cli.ContainerTop(ctx, e.Name, []string{})
-
-				if err == nil {
-					pidIdx := -1
-
-					for x := range proc.Titles {
-						if proc.Titles[x] == "PID" {
-							pidIdx = x
-						}
-					}
-
-					if pidIdx != -1 {
-		    	    	for x := range proc.Processes {
-		                    pid, err := strconv.Atoi(proc.Processes[x][pidIdx])
-
-		                    if err != nil {
-		                        continue
-		                    }
-
-		                    p, err := os.FindProcess(pid)
-
-		                    if err != nil {
-		                        continue
-		                    }
-		                    p.Release()
-						}
-					}
-
-				}*/
-
-		cli.ContainerKill(ctx, e.Name, "SIGKILL")
-
-		return ExecResult{ExecTimeLimitExceeded, 0, 0, 0, "", ""}
 	}
 
 	<-stdoutErr
 	<-stderrErr
+	
+	rc, _, err := cli.CopyFromContainer(ctx, e.Name, "/tmp/time.txt")
+	
+	if err != nil {
+		cli.ContainerKill(ctx, e.Name, "SIGKILL")
+		
+		return ExecResult{ExecError, 0, 0, 0, "", "Failed to read the execution time. " + err.Error()}
+	}
+	
+	tarStream := tar.NewReader(rc)
+	tarStream.Next()
+	
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(tarStream)
+	arrRes := strings.Split(buf.String(), " ")
+	
+	if len(arrRes) != 2 {
+		cli.ContainerKill(ctx, e.Name, "SIGKILL")
+		
+		return ExecResult{ExecError, 0, 0, 0, "", "Failed to parse the result."}
+	}
+	
+	execSec, err := strconv.ParseFloat(arrRes[0], 64)
+	
+	if err != nil {
+		return ExecResult{ExecError, 0, 0, 0, "", "Failed to parse the execution result."}
+	}
+	
+	execTime := int64(execSec * 1000)
+	
+	exit64, err := strconv.ParseInt(strings.Split(arrRes[1], "\n")[0], 10, 32)
+	
+	if err != nil {
+		return ExecResult{ExecError, 0, 0, 0, "", "Failed to parse the exit code."}
+	}
+	
+	exitCode := int(exit64)
+	
+	if execTime > e.Time {
+		cli.ContainerKill(ctx, e.Name, "SIGKILL")
+		
+		return ExecResult{ExecTimeLimitExceeded, 0, 0, 0, "", ""}
+	}
 
 	usedMem, err := memc.getValInt("memory.max_usage_in_bytes")
 
 	if usedMem >= e.Mem {
 		return ExecResult{ExecMemoryLimitExceeded, 0, 0, 0, "", ""}
-	}
-
-	insp, err := cli.ContainerInspect(ctx, e.Name)
-
-	exitCode := 0
-	if err == nil && insp.State != nil {
-		exitCode = insp.State.ExitCode
 	}
 
 	return ExecResult{ExecFinished, execTime, usedMem, exitCode, stdout, stderr}
@@ -255,7 +192,7 @@ func (e *Executor) Delete() error {
 	}
 }
 
-func NewExecutor(name string, mem int64, cmd []string, img string, binds []string, user string) (*Executor, error) {
+func NewExecutor(name string, mem int64, time int64, cmd []string, img string, binds []string) (*Executor, error) {
 	ctx := context.Background()
 
 	cg := NewCgroup(name)
@@ -290,9 +227,22 @@ func NewExecutor(name string, mem int64, cmd []string, img string, binds []strin
 	cfg.AttachStdin = true
 	cfg.OpenStdin = true
 	cfg.StdinOnce = true
-	cfg.User = user
 	cfg.Image = img
-	cfg.Cmd = cmd
+	cfg.Hostname = "localhost"
+	
+	var timer = []string{"/usr/bin/time", "-q", "-f", "%e %x", "-o", "/tmp/time.txt", "/usr/bin/timeout", strconv.FormatInt((time + 999) / 1000, 10), "/usr/bin/sudo", "-u", "nobody"}
+
+	newCmd := make([]string, 0, len(cmd) + len(timer))
+	
+	for i := range timer {
+		newCmd = append(newCmd, timer[i])
+	}
+	
+	for i := range cmd {
+		newCmd = append(newCmd, cmd[i])
+	}
+	
+	cfg.Cmd = newCmd
 
 	hcfg := container.HostConfig{}
 
@@ -310,5 +260,5 @@ func NewExecutor(name string, mem int64, cmd []string, img string, binds []strin
 		return nil, errors.New("Failed to create a container " + err.Error())
 	}
 
-	return &Executor{name, mem, cg}, nil
+	return &Executor{name, mem, time, cg}, nil
 }

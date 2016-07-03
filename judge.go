@@ -1,15 +1,17 @@
 package main
 
 import "os"
-import "github.com/docker/engine-api/client"
 import "math/rand"
-import "os/exec"
+//import "os/exec"
 import "strconv"
 import "github.com/seehuhn/mt19937"
 import "time"
-import "os/user"
+//import "os/user"
 
-var cli *client.Client
+type TCType struct {
+	Name string
+	In   string
+}
 
 type ExecRequest struct {
 	Image          string
@@ -23,36 +25,37 @@ type Judge struct {
 	Exec    ExecRequest
 	Time    int64
 	Mem     int64
-	TCCount int // The number of test cases
 }
 
 type JudgeResult int
 
 const (
-	Accepted                   JudgeResult = 0
-	WrongAnswer                JudgeResult = 1
-	MemoryLimitExceeded        JudgeResult = 2
-	TimeLimitExceeded          JudgeResult = 3
-	RuntimeError               JudgeResult = 4
-	InternalError              JudgeResult = 5
-	Judging                    JudgeResult = 6
-	CompileError               JudgeResult = 7
-	CompileTimeLimitExceeded   JudgeResult = 8
-	CompileMemoryLimitExceeded JudgeResult = 9
+    Finished                   JudgeResult = 0
+	Accepted                   JudgeResult = 1
+	WrongAnswer                JudgeResult = 2
+	MemoryLimitExceeded        JudgeResult = 3
+	TimeLimitExceeded          JudgeResult = 4
+	RuntimeError               JudgeResult = 5
+	InternalError              JudgeResult = 6
+	Judging                    JudgeResult = 7
+	CompileError               JudgeResult = 8
+	CompileTimeLimitExceeded   JudgeResult = 9
+	CompileMemoryLimitExceeded JudgeResult = 10
 )
 
-var JudgeResultToStr = [...]string{"Accepted", "WrongAnswer", "MemoryLimitExceeded", "TimeLimitExceeded", "RuntimeError", "InternalError", "Judging", "CompileError", "CompileTimeLimitExceeded", "CompileMemoryLimitExceeded"}
+var JudgeResultToStr = [...]string{"Finished", "Accepted", "WrongAnswer", "MemoryLimitExceeded", "TimeLimitExceeded", "RuntimeError", "InternalError", "Judging", "CompileError", "CompileTimeLimitExceeded", "CompileMemoryLimitExceeded", "Finished"}
 
 type JudgeStatus struct {
-	Case *string
-	JR   JudgeResult
-	Mem  int64
-	Time int64
-	Msg  *string
+	Case *string `json:"case"`
+	JR   JudgeResult `json:"jr"`
+	Mem  int64	`json:"mem"`
+	Time int64	`json:"time"`
+    Stdout *string `json:"stdout"`
+    Stderr *string `json:"stderr"` // error and messageMsg
 }
 
 func CreateInternalError(msg string) JudgeStatus {
-	return JudgeStatus{nil, InternalError, 0, 0, &msg}
+	return JudgeStatus{JR: InternalError, Stderr: &msg}
 }
 
 const BASE_RAND_STRING = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -61,25 +64,22 @@ func RandomName() string {
 	rng := rand.New(mt19937.New())
 	rng.Seed(time.Now().UnixNano())
 
-	res := make([]byte, 0, 32)
-	for i := 0; i < 32; i++ {
+	res := make([]byte, 0, 16)
+	for i := 0; i < 16; i++ {
 		res = append(res, BASE_RAND_STRING[rng.Intn(len(BASE_RAND_STRING))])
 	}
 
 	return string(res)
 }
 
-func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
-	Name string
-	In   string
-	Out  string
-}) {
+func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan TCType) {
 	// Close a channel to send results of judging
 	defer close(ch)
 
 	// Identity
 	id := RandomName()
 
+    /*
 	// User
 	_, err := exec.Command("useradd", "--no-create-home", id).Output()
 
@@ -112,11 +112,11 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 	}
 
 	defer exec.Command("userdel", id).Output()
-
+    */
 	// Working Directory
 	path := workingDirectory + "/" + id
 
-	err = os.Mkdir(path, 0777)
+	err := os.Mkdir(path, 0777)
 
 	if err != nil {
 		ch <- CreateInternalError("Failed to create a directory. " + err.Error())
@@ -126,8 +126,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 
 	defer os.RemoveAll(path)
 
-	uidInt = uidInt * gidInt / gidInt
-	err = os.Chown(path, int(uidInt), int(gidInt))
+	//err = os.Chown(path, int(uidInt), int(gidInt))
 
 	if err != nil {
 		ch <- CreateInternalError("Failed to chown the directory. " + err.Error())
@@ -178,7 +177,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 
 	// Compile
 	if j.Compile != nil {
-		exe, err := NewExecutor(id, 512*1024*1024, j.Compile.Cmd, j.Compile.Image, []string{path + ":" + "/work"}, uid.Uid)
+		exe, err := NewExecutor(id, 512*1024*1024, 10000, j.Compile.Cmd, j.Compile.Image, []string{path + ":" + "/work"})
 
 		if err != nil {
 			ch <- CreateInternalError("Failed to create a Docker container to compile your code." + err.Error())
@@ -186,7 +185,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 			return
 		}
 
-		res := exe.Run(10000, "")
+		res := exe.Run("")
 
 		exe.Delete()
 		if res.Status != ExecFinished {
@@ -206,15 +205,15 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 			}
 		}
 
-		if res.ExitCode != 0 { // Debug
+		if res.ExitCode != 0 {
 			msg := res.Stdout + res.Stderr
-			ch <- JudgeStatus{JR: CompileError, Msg: &msg}
+			ch <- JudgeStatus{JR: CompileError, Stderr: &msg}
 
 			return
 		}
 	}
 
-	exe, err := NewExecutor(id, j.Mem, j.Exec.Cmd, j.Exec.Image, []string{path + ":" + "/work:ro"}, uid.Uid)
+	exe, err := NewExecutor(id, j.Mem, j.Time, j.Exec.Cmd, j.Exec.Image, []string{path + ":" + "/work:ro"})
 
 	if err != nil {
 		ch <- CreateInternalError("Failed to create a Docker container to judge." + err.Error())
@@ -243,21 +242,22 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 	}
 
 	var maxTime, maxMem int64
+
 	for tc, res := <-tests; res; tc, res = <-tests {
 		tcCounter++
 
-		msg := strconv.FormatInt(int64(tcCounter), 10) + "/" + strconv.FormatInt(int64(j.TCCount), 10)
-		ch <- JudgeStatus{JR: Judging, Msg: &msg}
+		msg := strconv.FormatInt(int64(tcCounter), 10)
+		ch <- JudgeStatus{JR: Judging, Stderr: &msg}
 
 		r := Accepted
-		res := exe.Run(j.Time, tc.In)
+		res := exe.Run(tc.In)
 		
 		name := tc.Name
 		if res.Status != ExecFinished {
 			switch res.Status {
 			case ExecError:
-				msg := "Failed to execute your code." + res.Stderr
-				ch <- JudgeStatus{Case: &name, JR: InternalError, Msg: &msg}
+				msg := "Failed to execute your code. " + res.Stderr
+				ch <- CreateInternalError(msg)
 				r = InternalError
 				maxMem = -1
 				maxTime = -1
@@ -279,13 +279,14 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan struct {
 				maxMem = -1
 				maxTime = -1
 			} else {
-				if res.Stdout == tc.Out {
-					ch <- JudgeStatus{Case: &name, JR: Accepted, Mem: res.Mem, Time: res.Time}
+				/*if res.Stdout == tc.Out {
+					ch <- JudgeStatus{Case: &name, JR: Accepted, Mem: res.Mem, Time: res.Time, Stdout: &res.Stdout, Stderr: &res.Stderr}
 					r = Accepted
 				} else {
-					ch <- JudgeStatus{Case: &name, JR: WrongAnswer, Mem: res.Mem, Time: res.Time}
+					ch <- JudgeStatus{Case: &name, JR: WrongAnswer, Mem: res.Mem, Time: res.Time, Stdout: &res.Stdout, Stderr: &res.Stderr}
 					r = WrongAnswer
-				}
+				}*/
+                ch <- JudgeStatus{Case: &name, JR: Finished, Mem: res.Mem, Time: res.Time, Stdout: &res.Stdout, Stderr: &res.Stderr}
 				if maxMem != -1 {
 					maxMem = maxInt64(maxMem, res.Mem)
 				}
