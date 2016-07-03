@@ -112,7 +112,7 @@ func (e *Executor) Run(input string) ExecResult {
 	<-stdinErr
 
 	ctx := context.Background()
-	err := cli.ContainerStart(ctx, e.Name, ContainerStartOptions{})
+	err := cli.ContainerStart(ctx, e.Name, types.ContainerStartOptions{})
 
 	if err != nil {
 		return ExecResult{ExecError, 0, 0, 0, "", "Failed to start a container. " + err.Error()}
