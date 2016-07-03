@@ -2,10 +2,12 @@ package main
 
 import "os"
 import "math/rand"
+
 //import "os/exec"
 import "strconv"
 import "github.com/seehuhn/mt19937"
 import "time"
+
 //import "os/user"
 
 type TCType struct {
@@ -27,31 +29,31 @@ type Judge struct {
 	Mem     int64
 }
 
-type JudgeResult int
+type JudgeResultCode int
 
 const (
-    Finished                   JudgeResult = 0
-	Accepted                   JudgeResult = 1
-	WrongAnswer                JudgeResult = 2
-	MemoryLimitExceeded        JudgeResult = 3
-	TimeLimitExceeded          JudgeResult = 4
-	RuntimeError               JudgeResult = 5
-	InternalError              JudgeResult = 6
-	Judging                    JudgeResult = 7
-	CompileError               JudgeResult = 8
-	CompileTimeLimitExceeded   JudgeResult = 9
-	CompileMemoryLimitExceeded JudgeResult = 10
+	Finished                   JudgeResultCode = 0
+	Accepted                   JudgeResultCode = 1
+	WrongAnswer                JudgeResultCode = 2
+	MemoryLimitExceeded        JudgeResultCode = 3
+	TimeLimitExceeded          JudgeResultCode = 4
+	RuntimeError               JudgeResultCode = 5
+	InternalError              JudgeResultCode = 6
+	Judging                    JudgeResultCode = 7
+	CompileError               JudgeResultCode = 8
+	CompileTimeLimitExceeded   JudgeResultCode = 9
+	CompileMemoryLimitExceeded JudgeResultCode = 10
 )
 
 var JudgeResultToStr = [...]string{"Finished", "Accepted", "WrongAnswer", "MemoryLimitExceeded", "TimeLimitExceeded", "RuntimeError", "InternalError", "Judging", "CompileError", "CompileTimeLimitExceeded", "CompileMemoryLimitExceeded", "Finished"}
 
 type JudgeStatus struct {
-	Case *string `json:"case"`
-	JR   JudgeResult `json:"jr"`
-	Mem  int64	`json:"mem"`
-	Time int64	`json:"time"`
-    Stdout *string `json:"stdout"`
-    Stderr *string `json:"stderr"` // error and messageMsg
+	Case   *string         `json:"case"`
+	JR     JudgeResultCode `json:"jr"`
+	Mem    int64           `json:"mem"`
+	Time   int64           `json:"time"`
+	Stdout *string         `json:"stdout"`
+	Stderr *string         `json:"stderr"` // error and messageMsg
 }
 
 func CreateInternalError(msg string) JudgeStatus {
@@ -79,40 +81,40 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan TCType) {
 	// Identity
 	id := RandomName()
 
-    /*
-	// User
-	_, err := exec.Command("useradd", "--no-create-home", id).Output()
+	/*
+		// User
+		_, err := exec.Command("useradd", "--no-create-home", id).Output()
 
-	if err != nil {
-		ch <- CreateInternalError("Failed to create a directory to build your code. " + err.Error())
+		if err != nil {
+			ch <- CreateInternalError("Failed to create a directory to build your code. " + err.Error())
 
-		return
-	}
+			return
+		}
 
-	uid, err := user.Lookup(id)
+		uid, err := user.Lookup(id)
 
-	if err != nil {
-		ch <- CreateInternalError("Failed to look up a user. " + err.Error())
+		if err != nil {
+			ch <- CreateInternalError("Failed to look up a user. " + err.Error())
 
-		return
-	}
+			return
+		}
 
-	uidInt, err := strconv.ParseInt(uid.Uid, 10, 64)
-	if err != nil {
-		ch <- CreateInternalError("Failed to parseInt uid. " + err.Error())
+		uidInt, err := strconv.ParseInt(uid.Uid, 10, 64)
+		if err != nil {
+			ch <- CreateInternalError("Failed to parseInt uid. " + err.Error())
 
-		return
-	}
+			return
+		}
 
-	gidInt, err := strconv.ParseInt(uid.Gid, 10, 64)
-	if err != nil {
-		ch <- CreateInternalError("Failed to parseInt gid. " + err.Error())
+		gidInt, err := strconv.ParseInt(uid.Gid, 10, 64)
+		if err != nil {
+			ch <- CreateInternalError("Failed to parseInt gid. " + err.Error())
 
-		return
-	}
+			return
+		}
 
-	defer exec.Command("userdel", id).Output()
-    */
+		defer exec.Command("userdel", id).Output()
+	*/
 	// Working Directory
 	path := workingDirectory + "/" + id
 
@@ -251,7 +253,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan TCType) {
 
 		r := Accepted
 		res := exe.Run(tc.In)
-		
+
 		name := tc.Name
 		if res.Status != ExecFinished {
 			switch res.Status {
@@ -286,7 +288,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan TCType) {
 					ch <- JudgeStatus{Case: &name, JR: WrongAnswer, Mem: res.Mem, Time: res.Time, Stdout: &res.Stdout, Stderr: &res.Stderr}
 					r = WrongAnswer
 				}*/
-                ch <- JudgeStatus{Case: &name, JR: Finished, Mem: res.Mem, Time: res.Time, Stdout: &res.Stdout, Stderr: &res.Stderr}
+				ch <- JudgeStatus{Case: &name, JR: Finished, Mem: res.Mem, Time: res.Time, Stdout: &res.Stdout, Stderr: &res.Stderr}
 				if maxMem != -1 {
 					maxMem = maxInt64(maxMem, res.Mem)
 				}
@@ -299,5 +301,5 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan TCType) {
 		totalResult = maxInt(totalResult, int(r))
 	}
 
-	ch <- JudgeStatus{JR: JudgeResult(totalResult), Time: maxTime, Mem: maxMem}
+	ch <- JudgeStatus{JR: JudgeResultCode(totalResult), Time: maxTime, Mem: maxMem}
 }
