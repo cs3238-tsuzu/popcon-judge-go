@@ -2,7 +2,6 @@ package transfer
 
 import (
 	"github.com/gorilla/websocket"
-	"fmt"
 	"log"
 	"os"
 	"time"
@@ -16,11 +15,11 @@ func NewTransfer(ep, authID string, paral int) (*Transfer, error) {
         return nil, err
     }
     
-    if resp.StatusCode != 200 {
-        return nil, errors.New(fmt.Sprint(resp.StatusCode, " ", resp.Status))
+    if resp.StatusCode != 101 {
+        return nil, errors.New(resp.Status)
     }
     
-    return &Transfer{Conn: conn, Log: *log.New(os.Stdout, "websock: ", log.LstdFlags)}, nil
+    return &Transfer{Conn: conn, Log: *log.New(os.Stdout, "websock: ", log.LstdFlags), Parallelism: paral}, nil
 }
 
 type TransferedResponse struct {
@@ -125,7 +124,7 @@ type JudgeRequest struct {
     Type JudgeType
     Checker string
     CheckerLang int64
-    Cases map[int]TestCase
+    Cases map[string]TestCase
     Time int64
     Mem int64
 }

@@ -3,3 +3,4 @@ deploy.sh
 vendor/
 .DS_Store
 .vscode/
+pj.json

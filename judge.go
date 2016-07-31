@@ -11,7 +11,7 @@ import "time"
 
 type TCType struct {
 	ID int
-	In   string
+	In string
 }
 
 type ExecRequest struct {
@@ -45,12 +45,12 @@ const (
 var JudgeResultCodeToStr = [...]string{"Finished", "MemoryLimitExceeded", "TimeLimitExceeded", "RuntimeError", "InternalError", "Judging", "CompileError", "CompileTimeLimitExceeded", "CompileMemoryLimitExceeded"}
 
 type JudgeStatus struct {
-	Case   int         `json:"case"`
+	Case   int             `json:"case"`
 	JR     JudgeResultCode `json:"jr"`
 	Mem    int64           `json:"mem"`
 	Time   int64           `json:"time"`
-	Stdout string         `json:"stdout"`
-	Stderr string         `json:"stderr"` // error and messageMsg
+	Stdout string          `json:"stdout"`
+	Stderr string          `json:"stderr"` // error and messageMsg
 }
 
 func CreateInternalError(id int, msg string) JudgeStatus {
@@ -118,7 +118,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan TCType) {
 	err := os.Mkdir(path, 0777)
 
 	if err != nil {
-		ch <- CreateInternalError(-1, "Failed to create a directory. " + err.Error())
+		ch <- CreateInternalError(-1, "Failed to create a directory. "+err.Error())
 
 		return
 	}
@@ -128,7 +128,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan TCType) {
 	//err = os.Chown(path, int(uidInt), int(gidInt))
 
 	if err != nil {
-		ch <- CreateInternalError(-1, "Failed to chown the directory. " + err.Error())
+		ch <- CreateInternalError(-1, "Failed to chown the directory. "+err.Error())
 
 		return
 	}
@@ -136,7 +136,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan TCType) {
 	err = os.Chmod(path, 0777)
 
 	if err != nil {
-		ch <- CreateInternalError(-1, "Failed to chmod the directory. " + err.Error())
+		ch <- CreateInternalError(-1, "Failed to chmod the directory. "+err.Error())
 
 		return
 	}
@@ -145,7 +145,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan TCType) {
 	fp, err := os.Create(path + "/" + j.Compile.SourceFileName)
 
 	if err != nil {
-		ch <- CreateInternalError(-1, "Failed to create source file." + err.Error())
+		ch <- CreateInternalError(-1, "Failed to create source file."+err.Error())
 
 		return
 	}
@@ -153,7 +153,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan TCType) {
 	l, err := fp.Write([]byte(j.Code))
 
 	if err != nil {
-		ch <- CreateInternalError(-1, "Failed to write your code on your file. " + err.Error())
+		ch <- CreateInternalError(-1, "Failed to write your code on your file. "+err.Error())
 
 		return
 	}
@@ -169,7 +169,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan TCType) {
 	err = os.Chmod(path+"/"+j.Compile.SourceFileName, 0644)
 
 	if err != nil {
-		ch <- CreateInternalError(-1, "Failed to chmod the source file. " + err.Error())
+		ch <- CreateInternalError(-1, "Failed to chmod the source file. "+err.Error())
 
 		return
 	}
@@ -179,18 +179,17 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan TCType) {
 		exe, err := NewExecutor(id, 512*1024*1024, 10000, j.Compile.Cmd, j.Compile.Image, []string{path + ":" + "/work"})
 
 		if err != nil {
-			ch <- CreateInternalError(-1, "Failed to create a Docker container to compile your code." + err.Error())
+			ch <- CreateInternalError(-1, "Failed to create a Docker container to compile your code."+err.Error())
 
 			return
 		}
 
 		res := exe.Run("")
 
-		exe.Delete()
 		if res.Status != ExecFinished {
 			switch res.Status {
 			case ExecError:
-				ch <- CreateInternalError(-1, "Failed to execute a compiler." + res.Stderr)
+				ch <- CreateInternalError(-1, "Failed to execute a compiler."+res.Stderr)
 
 				return
 			case ExecMemoryLimitExceeded:
@@ -214,7 +213,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan TCType) {
 	exe, err := NewExecutor(id, j.Mem, j.Time, j.Exec.Cmd, j.Exec.Image, []string{path + ":" + "/work:ro"})
 
 	if err != nil {
-		ch <- CreateInternalError(-1, "Failed to create a Docker container to judge." + err.Error())
+		ch <- CreateInternalError(-1, "Failed to create a Docker container to judge."+err.Error())
 
 		return
 	}
@@ -241,7 +240,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan TCType) {
 
 	for tc, res := <-tests; res; tc, res = <-tests {
 		name := tc.ID
-		
+
 		ch <- JudgeStatus{Case: name, JR: Judging}
 
 		r := Finished

@@ -120,54 +120,52 @@ func (e *Executor) Run(input string) ExecResult {
 
 	<-stdoutErr
 	<-stderrErr
-	
-	rc, _, err := cli.CopyFromContainer(ctx, e.Name, "/tmp/time.txt")
-	
-	if err != nil {
-		cli.ContainerKill(ctx, e.Name, "SIGKILL")
-		
-		return ExecResult{ExecError, 0, 0, 0, "", "Failed to read the execution time. " + err.Error()}
-	}
-	
-	tarStream := tar.NewReader(rc)
-	tarStream.Next()
-	
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(tarStream)
-	arrRes := strings.Split(buf.String(), " ")
-	
-	if len(arrRes) != 2 {
-		cli.ContainerKill(ctx, e.Name, "SIGKILL")
-		
-		return ExecResult{ExecError, 0, 0, 0, "", "Failed to parse the result."}
-	}
-	
-	execSec, err := strconv.ParseFloat(arrRes[0], 64)
-	
-	if err != nil {
-		return ExecResult{ExecError, 0, 0, 0, "", "Failed to parse the execution result."}
-	}
-	
-	execTime := int64(execSec * 1000)
-	
-	exit64, err := strconv.ParseInt(strings.Split(arrRes[1], "\n")[0], 10, 32)
-	
-	if err != nil {
-		return ExecResult{ExecError, 0, 0, 0, "", "Failed to parse the exit code."}
-	}
-	
-	exitCode := int(exit64)
-	
-	if execTime > e.Time {
-		cli.ContainerKill(ctx, e.Name, "SIGKILL")
-		
-		return ExecResult{ExecTimeLimitExceeded, 0, 0, 0, "", ""}
-	}
 
-	usedMem, err := memc.getValInt("memory.max_usage_in_bytes")
+	usedMem, err := memc.getValInt("memory.memsw.max_usage_in_bytes")
 
 	if usedMem >= e.Mem {
 		return ExecResult{ExecMemoryLimitExceeded, 0, 0, 0, "", ""}
+	}
+
+	rc, _, err := cli.CopyFromContainer(ctx, e.Name, "/tmp/time.txt")
+
+	if err != nil {
+		cli.ContainerKill(ctx, e.Name, "SIGKILL")
+
+		return ExecResult{ExecError, 0, 0, 0, "", "Failed to read the execution time. " + err.Error()}
+	}
+
+	tarStream := tar.NewReader(rc)
+	tarStream.Next()
+
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(tarStream)
+	arrRes := strings.Split(buf.String(), " ")
+
+	if len(arrRes) != 2 {
+		return ExecResult{ExecError, 0, 0, 0, "", "Failed to parse the result."}
+	}
+
+	execSec, err := strconv.ParseFloat(arrRes[0], 64)
+
+	if err != nil {
+		return ExecResult{ExecError, 0, 0, 0, "", "Failed to parse the execution result."}
+	}
+
+	execTime := int64(execSec * 1000)
+
+	exit64, err := strconv.ParseInt(strings.Split(arrRes[1], "\n")[0], 10, 32)
+
+	if err != nil {
+		return ExecResult{ExecError, 0, 0, 0, "", "Failed to parse the exit code."}
+	}
+
+	exitCode := int(exit64)
+
+	if execSec*1000 > float64(e.Time) {
+		cli.ContainerKill(ctx, e.Name, "SIGKILL")
+
+		return ExecResult{ExecTimeLimitExceeded, 0, 0, 0, "", ""}
 	}
 
 	return ExecResult{ExecFinished, execTime, usedMem, exitCode, stdout, stderr}
@@ -229,19 +227,19 @@ func NewExecutor(name string, mem int64, time int64, cmd []string, img string, b
 	cfg.StdinOnce = true
 	cfg.Image = img
 	cfg.Hostname = "localhost"
-	
-	var timer = []string{"/usr/bin/time", "-q", "-f", "%e %x", "-o", "/tmp/time.txt", "/usr/bin/timeout", strconv.FormatInt((time + 999) / 1000, 10), "/usr/bin/sudo", "-u", "nobody"}
 
-	newCmd := make([]string, 0, len(cmd) + len(timer))
-	
+	var timer = []string{"/usr/bin/time", "-q", "-f", "%e %x", "-o", "/tmp/time.txt", "/usr/bin/timeout", strconv.FormatInt((time+1000)/1000, 10), "/usr/bin/sudo", "-u", "nobody"}
+
+	newCmd := make([]string, 0, len(cmd)+len(timer))
+
 	for i := range timer {
 		newCmd = append(newCmd, timer[i])
 	}
-	
+
 	for i := range cmd {
 		newCmd = append(newCmd, cmd[i])
 	}
-	
+
 	cfg.Cmd = newCmd
 
 	hcfg := container.HostConfig{}

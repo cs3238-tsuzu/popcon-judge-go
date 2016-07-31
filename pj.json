@@ -2,5 +2,8 @@
     "name": "test-server",
     "parallelism": 2,
     "cpu_usage": 100,
-    "version": "0.01"
+	"auth": "tsuzuhogehoge",
+	"languages": {
+		"1": {"SourceFileName":"main.cpp","Compile":true,"CompileCmd":["g++", "-std=c++14", "-O2", "/work/main.cpp", "-o", "/work/a.out"],"CompileImage":"ubuntu-popcon","ExecCmd":["/work/a.out"],"ExecImage":"ubuntu-popcon"}
+	}
 }
