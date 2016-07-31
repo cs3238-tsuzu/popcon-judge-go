@@ -1,8 +1,7 @@
-package main
+package transfer
 
 import (
 	"github.com/gorilla/websocket"
-	"net/http"
 	"fmt"
 	"log"
 	"os"
@@ -10,7 +9,7 @@ import (
 	"errors"
 )
 
-func NewTransfer(ep, authID string) (*Transfer, error) {
+func NewTransfer(ep, authID string, paral int) (*Transfer, error) {
     conn, resp, err := websocket.DefaultDialer.Dial(ep, map[string][]string{"Authentication": []string{authID}})
     
     if err != nil {
@@ -24,16 +23,24 @@ func NewTransfer(ep, authID string) (*Transfer, error) {
     return &Transfer{Conn: conn, Log: *log.New(os.Stdout, "websock: ", log.LstdFlags)}, nil
 }
 
+type TransferedResponse struct {
+    Resp JudgeResponse
+    NewJudge int
+}
+
 type Transfer struct {
     Conn *websocket.Conn
     Log log.Logger
+    Parallelism int
 
-    JudgeRequestChan chan JudgeRequest
-    ResponseChan chan TransferResponse
+    RequestChan chan JudgeRequest
+    ResponseChan chan JudgeResponse
 }
 
 func (tr *Transfer) Run() bool { // Start goroutines
     if tr.Conn != nil {
+        tr.Conn.WriteJSON(TransferedResponse{JudgeResponse{Sid: -1}, tr.Parallelism})
+
         go tr.writer()
         go tr.reader()
         
@@ -51,7 +58,13 @@ func (tr *Transfer) writer() { // called from only Run()
             return
         }
         
-        err := tr.Conn.WriteJSON(r)
+        t := TransferedResponse{r, 0}
+
+        if r.Case == -1 {
+            t.NewJudge = 1
+        }
+
+        err := tr.Conn.WriteJSON(t)
 
         if err != nil {
             tr.Log.Println(err.Error())
@@ -63,60 +76,66 @@ func (tr *Transfer) writer() { // called from only Run()
 
 func (tr *Transfer) reader() { // called from only Run()
     for {
-        re := TransferRequest{}
+        jr := JudgeRequest{}
         
-        err := tr.Conn.ReadJSON(&re)
+        err := tr.Conn.ReadJSON(&jr)
         
         if err != nil {
             tr.Log.Println(err.Error())
             
             time.Sleep(time.Second * 1)
         }
+
+        tr.RequestChan <- jr
     }
 }
 
-type RequestType int
+// フロントエンド(github.com/cs3238-tsuzu/popcon)と共通
+type JudgeType int
 
 const (
-    RequestJudge RequestType = 0
+    JudgePerfectMatch JudgeType = 0
+    JudgeRunningCode JudgeType = 1
 )
 
-type TransferRequest struct {
-    ReqType RequestType `json:"request_type"`
-    Data string `json: "data"`
+type SubmissionStatus int64
+
+const (
+	InQueue             SubmissionStatus = 0 // Not used
+	Judging             SubmissionStatus = 1
+	Accepted            SubmissionStatus = 2
+	WrongAnswer         SubmissionStatus = 3
+	TimeLimitExceeded   SubmissionStatus = 4
+	MemoryLimitExceeded SubmissionStatus = 5
+	RuntimeError        SubmissionStatus = 6
+	CompileError        SubmissionStatus = 7
+	InternalError       SubmissionStatus = 8
+)
+
+type TestCase struct {
+    Name string
+    Input string
+    Output string
 }
-
-type JudgeTypeType int
-
-const (
-    JudgeTypeSimple JudgeTypeType = 0
-)
 
 type JudgeRequest struct {
-    CID string `json:"cid"` // ContestID
-    SID string `json:"sid"` // Submission ID
-    Code string `json:"code"`
-    Lang string `json:"lang"`
-    JudgeType string `json:"type"`
-    Cases []string `json:"type"`
-}
-
-type ResponseType int
-
-const (
-    ResponseJudge ResponseType = 0
-)
-
-type TransferResponse struct {
-    ResType ResponseType `json:"response_type"`
-    Data string `json:"data"`
+    Sid int64 // Submission ID
+    Code string
+    Lang int64
+    Type JudgeType
+    Checker string
+    CheckerLang int64
+    Cases map[int]TestCase
+    Time int64
+    Mem int64
 }
 
 type JudgeResponse struct {
-    CID string `json:"cid"` //ContestID
-    SID string `json:"sid"` //SubmissionID
-    Status int `json:"status"`
-    Msg *string `json:"msg"`
-    Time int64 `json:"time"`
-    Mem int64 `json:"mem"`
+    Sid int64 //SubmissionID
+    Status SubmissionStatus 
+    Msg string
+    Time int64
+    Mem int64
+    Case int
+    CaseName string
 }

@@ -7,7 +7,9 @@ import (
 	"os"
 
 	"github.com/docker/engine-api/client"
+	"github.com/cs3238-tsuzu/popcon-judge-go/Transfer"
 	"log"
+	"strconv"
 )
 
 // SettingsTemplate is a template of a setting json
@@ -15,7 +17,18 @@ const SettingsTemplate = `{
     "name": "test-server",
     "parallelism": 2,
     "cpu_usage": 100,
+	"auth": "****",
+	"languages": {},
 }`
+
+type Language struct {
+	SourceFileName string
+	Compile bool
+	CompileCmd []string
+	CompileImage string
+	ExecCmd []string
+	ExecImage string
+}
 
 // SettingsInterface is a interface of setting file
 // Generated at https://mholt.github.io/json-to-go/
@@ -23,6 +36,12 @@ type SettingsInterface struct {
 	Name        string `json:"name"`
 	Parallelism int    `json:"parallelism"`
 	CPUUsage    int    `json:"cpu_usage"`
+	Auth string `json:"auth"`
+	Languages map[string]Language // string(lid int64)
+}
+
+func CreateStringPointer(str string) (*string) {
+	return &str
 }
 
 func main() {
@@ -30,8 +49,15 @@ func main() {
 	wdir := flag.String("wdir", "/tmp/pj", "A directory to execute programs")
 	server := flag.String("server", "ws://192.168.2.1:8080/", "popcon server address")
 	settings := flag.String("settings", "./pj.json", "Settings of popcon-judge")
+	genlang := flag.Bool("genlang", false, "Generate language setting")
 
 	flag.Parse()
+
+	if *genlang {
+		fmt.Println(json.Marshal(&Language{}))
+
+		return
+	}
 
 	if help != nil && *help {
 		flag.PrintDefaults()
@@ -48,6 +74,8 @@ func main() {
 
 		return
 	}
+
+	var languages map[int64]Language
 
 	if _, err = os.Stat(*settings); err != nil {
 		log.Println(err.Error())
@@ -87,6 +115,18 @@ func main() {
 
 			return
 		}
+
+		languages = make(map[int64]Language)
+
+		for k, v := range settingData.Languages {
+			lid, err := strconv.ParseInt(k, 10, 64)
+
+			if err != nil {
+				panic(err)
+			}
+
+			languages[lid] = v
+		}
 	}
 
 	// Copy instances to global ones
@@ -100,6 +140,267 @@ func main() {
 		panic(err)
 	}
 
+	trans, err := transfer.NewTransfer(*server, settingData.Auth, settingData.Parallelism)
+
+	if err != nil {
+		panic(err)
+	}
+
+	trans.RequestChan = make(chan transfer.JudgeRequest, 10)
+	trans.ResponseChan = make(chan transfer.JudgeResponse, 10)
+
+	suc := trans.Run()
+
+	if !suc {
+		panic(err)
+	}
+
+	for {
+		req, suc := <-trans.RequestChan
+
+		if !suc {
+			return
+		}
+
+		go func() {
+			j := Judge{}
+
+			lang, has := languages[req.Lang]
+
+			if !has {
+				trans.ResponseChan <- transfer.JudgeResponse{
+					Sid: req.Sid,
+					Status: transfer.InternalError,
+					Msg: "Unknown Language",
+					Case: -1,
+				}
+
+				return
+			}
+
+			j.Code = req.Code
+			j.Time = req.Time * 1000 // sec -> ms
+			j.Mem = req.Mem * 1000 * 1000 // MB ->bytes
+			
+			if lang.Compile {
+				j.Compile = &ExecRequest {
+					Image: lang.CompileImage,
+					Cmd: lang.CompileCmd,
+					SourceFileName: lang.SourceFileName,
+				}
+			}
+			
+			j.Exec = ExecRequest {
+				Image: lang.ExecImage,
+				Cmd: lang.ExecCmd,
+				SourceFileName: "",
+			}
+
+			casesChan := make(chan TCType, len(req.Cases))
+			statusChan := make(chan JudgeStatus, 10)
+
+			var check Judge
+			var checkerCasesChan chan TCType
+			var checkerStatusChan chan JudgeStatus
+
+			if req.Type == transfer.JudgeRunningCode {
+				check.Time = 3 * 1000
+				check.Code = req.Checker
+				check.Mem = 256 * 1000 * 1000
+
+				lang, has := languages[req.CheckerLang]
+
+				if !has {
+					trans.ResponseChan <- transfer.JudgeResponse{
+						Sid: req.Sid,
+						Status: transfer.InternalError,
+						Msg: "Unknown Language for Checker Program",
+						Case: -1,
+					}
+
+					return
+				}
+
+				if lang.Compile {
+					check.Compile = &ExecRequest {
+						Image: lang.CompileImage,
+						Cmd: lang.CompileCmd,
+						SourceFileName: lang.SourceFileName,
+					}
+				}
+			
+				check.Exec = ExecRequest {
+					Image: lang.ExecImage,
+					Cmd: lang.ExecCmd,
+					SourceFileName: "",
+				}
+
+				checkerCasesChan = make(chan TCType, len(req.Cases))
+				checkerStatusChan = make(chan JudgeStatus, 10)
+			}
+
+			j.Run(statusChan, casesChan)
+
+			go func() {
+				for k, v := range req.Cases {
+					casesChan <- TCType{ID: k, In: v.Input}
+				}
+				close(casesChan)
+			}()
+
+			respArr := make([]transfer.JudgeResponse, len(req.Cases) + 1)
+
+			respArr[len(respArr) - 1] = transfer.JudgeResponse {
+				Sid: req.Sid,
+				Status: transfer.InternalError,
+				Case: -1,
+			}
+
+			go func() {
+				totalStatus := transfer.Accepted
+
+				defer close(checkerCasesChan)
+
+				for {
+					stat, has := <-statusChan
+
+					if !has {
+						return
+					}
+
+					if stat.Case == -1 {
+						if stat.JR == MemoryLimitExceeded {
+							totalStatus = transfer.MemoryLimitExceeded
+						}else if stat.JR == TimeLimitExceeded {
+							totalStatus = transfer.MemoryLimitExceeded
+						}else if stat.JR == RuntimeError {
+							totalStatus = transfer.RuntimeError
+						}else if stat.JR == InternalError {
+							totalStatus = transfer.InternalError
+						}else if stat.JR >= 6 && stat.JR <= 8 {
+							totalStatus = transfer.CompileError
+
+							if stat.JR == CompileTimeLimitExceeded {
+								stat.Stderr = "Compile Time Limit Exceeded"
+							}else if stat.JR == CompileMemoryLimitExceeded {
+								stat.Stderr = "Compile Memory Limit Exceeded"
+							}
+						}
+
+						res := transfer.JudgeResponse {
+							Sid: req.Sid,
+							Status: totalStatus,
+							Case: -1,
+							Msg: stat.Stderr,
+							Time: stat.Time,
+							Mem: stat.Mem / 1000,
+						}
+
+						if req.Type == transfer.JudgePerfectMatch {
+							trans.ResponseChan <- res
+						}else {
+							respArr[len(respArr) - 1] = res
+						}
+
+						return
+					}else {
+						status := transfer.Accepted
+						if stat.JR == Judging {
+							trans.ResponseChan <- transfer.JudgeResponse {
+								Sid: req.Sid,
+								Status: transfer.Judging,
+								Case: stat.Case,
+								Msg: fmt.Sprint(stat.Case, "/", len(req.Cases)),
+								Time: stat.Time,
+								Mem: stat.Mem / 1000,
+							}
+							continue
+						}
+
+						if stat.JR == MemoryLimitExceeded {
+							status = transfer.MemoryLimitExceeded
+						}else if stat.JR == TimeLimitExceeded {
+							status = transfer.MemoryLimitExceeded
+						}else if stat.JR == RuntimeError {
+							status = transfer.RuntimeError
+						}else if stat.JR == InternalError {
+							status = transfer.InternalError
+						}
+
+						res := transfer.JudgeResponse {
+							Sid: req.Sid,
+							Status: status,
+							Case: stat.Case,
+							Time: stat.Time,
+							Mem: stat.Mem / 1000,
+						}
+
+						if status != transfer.Accepted {
+							trans.ResponseChan <- res
+						}else if req.Type == transfer.JudgeRunningCode {
+							respArr[stat.Case] = res
+							checkerCasesChan <- TCType{ID: stat.Case, In: "hogehoge"}
+						}else {
+							if stat.Stdout != req.Cases[stat.Case].Output {
+								res.Status = transfer.WrongAnswer
+								totalStatus = transfer.WrongAnswer
+							}
+							trans.ResponseChan <- res
+						}
+					}
+				}
+			}()
+
+			go func() {
+				setupFinished := false 
+				for {
+					stat, has := <-checkerStatusChan
+
+					if !has {
+						return
+					}
+
+					if stat.Case == -1 {
+						resp := respArr[len(respArr) - 1]
+						
+						if stat.JR == Finished {
+							if setupFinished {
+								resp.Status = transfer.Accepted
+							}
+						}else if stat.JR == RuntimeError {
+							resp.Status = transfer.WrongAnswer
+						}else {
+							resp.Msg = "Checker Program: " + JudgeResultCodeToStr[stat.JR]
+							resp.Status = transfer.InternalError
+
+							if stat.JR == CompileError {
+								resp.Msg = stat.Stderr
+							}
+						}
+	
+						trans.ResponseChan <- resp
+
+						return
+					}else {
+						setupFinished = true
+						resp := respArr[stat.Case]
+
+						if stat.JR == Finished {
+							resp.Status = transfer.Accepted
+						}else if stat.JR == RuntimeError {
+							resp.Status = transfer.WrongAnswer
+						}else {
+							resp.Msg = "Checker Program: " + JudgeResultCodeToStr[stat.JR]
+							resp.Status = transfer.InternalError
+						}
+
+						trans.ResponseChan <- resp
+					}
+				}
+			}()
+		}()
+	}
+
 	/*exe, err := NewExecutor("Hello", 100*1024*1024, []string{"/host_tmp/a.out"}, "ubuntu:16.04", []string{"/tmp:/host_tmp:ro"}, "")
 
 	if err != nil {
@@ -110,7 +411,7 @@ func main() {
 
 	res := exe.Run(1000, "Hello")
 	*/
-
+/*
 	j := Judge{}
 
 	j.Code = `
@@ -163,7 +464,7 @@ func main() {
 		} else {
 			cas = "<nil>"
 		}
-		fmt.Printf("Case: %s, Stdout: %s, Stderr: %s, Result: %s, Memory: %dKB, Time: %dms\n", cas, stdout, stderr, JudgeResultToStr[int(c.JR)], c.Mem/1000, c.Time)
+		fmt.Printf("Case: %s, Stdout: %s, Stderr: %s, Result: %s, Memory: %dKB, Time: %dms\n", cas, stdout, stderr, JudgeResultCodeToStr[int(c.JR)], c.Mem/1000, c.Time)
 	}
 
 	//	fmt.Println(res.ExitCode, res.Mem, res.Time, res.Status, res.Stdout, res.Stderr)
@@ -173,6 +474,6 @@ func main() {
 		if err != nil {
 			fmt.Println(err)
 		}
-	*/
-	fmt.Println(*wdir, *server)
+	
+	fmt.Println(*wdir, *server)*/
 }
