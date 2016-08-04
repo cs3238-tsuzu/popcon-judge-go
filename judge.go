@@ -10,8 +10,9 @@ import "time"
 //import "os/user"
 
 type TCType struct {
-	ID int
-	In string
+	ID  int
+	In  string
+	Out *string
 }
 
 type ExecRequest struct {
@@ -71,7 +72,7 @@ func RandomName() string {
 	return string(res)
 }
 
-func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan TCType) {
+func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan TCType, killChan chan bool) {
 	// Close a channel to send results of judging
 	defer close(ch)
 
@@ -186,6 +187,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan TCType) {
 
 		res := exe.Run("")
 
+		exe.Delete()
 		if res.Status != ExecFinished {
 			switch res.Status {
 			case ExecError:
@@ -238,59 +240,82 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan TCType) {
 
 	var maxTime, maxMem int64
 
-	for tc, res := <-tests; res; tc, res = <-tests {
-		name := tc.ID
+	for {
+		select {
+		case <-killChan:
+			ch <- JudgeStatus{Case: -1, JR: InternalError}
 
-		ch <- JudgeStatus{Case: name, JR: Judging}
+			return
+		case tc, has := <-tests:
 
-		r := Finished
-		res := exe.Run(tc.In)
-
-		if res.Status != ExecFinished {
-			switch res.Status {
-			case ExecError:
-				msg := "Failed to execute your code. " + res.Stderr
-				ch <- CreateInternalError(name, msg)
-				r = InternalError
-				maxMem = -1
-				maxTime = -1
-			case ExecMemoryLimitExceeded:
-				ch <- JudgeStatus{Case: name, JR: MemoryLimitExceeded}
-				r = MemoryLimitExceeded
-				maxMem = -1
-				maxTime = -1
-			case ExecTimeLimitExceeded:
-				ch <- JudgeStatus{Case: name, JR: TimeLimitExceeded}
-				r = TimeLimitExceeded
-				maxMem = -1
-				maxTime = -1
+			if !has {
+				goto loopEnd
 			}
-		} else {
-			if res.ExitCode != 0 {
-				ch <- JudgeStatus{Case: name, JR: RuntimeError}
-				r = RuntimeError
-				maxMem = -1
-				maxTime = -1
+			name := tc.ID
+
+			ch <- JudgeStatus{Case: name, JR: Judging}
+
+			r := Finished
+
+			var res ExecResult
+			if tc.Out != nil {
+				err := exe.CopyToContainer("/", []struct {
+					name    string
+					content string
+				}{{"input", tc.In}, {"output", *tc.Out}})
+
+				if err != nil {
+					ch <- CreateInternalError(name, "Failed to copy files to the container. "+err.Error())
+
+					continue
+				}
+
+				res = exe.Run("")
 			} else {
-				/*if res.Stdout == tc.Out {
-					ch <- JudgeStatus{Case: &name, JR: Accepted, Mem: res.Mem, Time: res.Time, Stdout: &res.Stdout, Stderr: &res.Stderr}
-					r = Accepted
-				} else {
-					ch <- JudgeStatus{Case: &name, JR: WrongAnswer, Mem: res.Mem, Time: res.Time, Stdout: &res.Stdout, Stderr: &res.Stderr}
-					r = WrongAnswer
-				}*/
-				ch <- JudgeStatus{Case: name, JR: Finished, Mem: res.Mem, Time: res.Time, Stdout: res.Stdout, Stderr: res.Stderr}
-				if maxMem != -1 {
-					maxMem = maxInt64(maxMem, res.Mem)
+				res = exe.Run(tc.In)
+			}
+
+			if res.Status != ExecFinished {
+				switch res.Status {
+				case ExecError:
+					msg := "Failed to execute your code. " + res.Stderr
+					ch <- CreateInternalError(name, msg)
+					r = InternalError
+					maxMem = -1
+					maxTime = -1
+				case ExecMemoryLimitExceeded:
+					ch <- JudgeStatus{Case: name, JR: MemoryLimitExceeded}
+					r = MemoryLimitExceeded
+					maxMem = -1
+					maxTime = -1
+				case ExecTimeLimitExceeded:
+					ch <- JudgeStatus{Case: name, JR: TimeLimitExceeded}
+					r = TimeLimitExceeded
+					maxMem = -1
+					maxTime = -1
 				}
-				if maxTime != -1 {
-					maxTime = maxInt64(maxTime, res.Time)
+			} else {
+				if res.ExitCode != 0 {
+					ch <- JudgeStatus{Case: name, JR: RuntimeError}
+					r = RuntimeError
+					maxMem = -1
+					maxTime = -1
+				} else {
+					ch <- JudgeStatus{Case: name, JR: Finished, Mem: res.Mem, Time: res.Time, Stdout: res.Stdout, Stderr: res.Stderr}
+					if maxMem != -1 {
+						maxMem = maxInt64(maxMem, res.Mem)
+					}
+					if maxTime != -1 {
+						maxTime = maxInt64(maxTime, res.Time)
+					}
 				}
 			}
-		}
 
-		totalResult = maxInt(totalResult, int(r))
+			totalResult = maxInt(totalResult, int(r))
+		}
 	}
+
+loopEnd:
 
 	ch <- JudgeStatus{Case: -1, JR: JudgeResultCode(totalResult), Time: maxTime, Mem: maxMem}
 }

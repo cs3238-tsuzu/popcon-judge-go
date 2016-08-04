@@ -1,9 +1,9 @@
 {
     "name": "test-server",
-    "parallelism": 2,
+    "parallelism": 3,
     "cpu_usage": 100,
-	"auth": "tsuzuhogehoge",
+	"auth": "oregapcp",
 	"languages": {
-		"1": {"SourceFileName":"main.cpp","Compile":true,"CompileCmd":["g++", "-std=c++14", "-O2", "/work/main.cpp", "-o", "/work/a.out"],"CompileImage":"ubuntu-popcon","ExecCmd":["/work/a.out"],"ExecImage":"ubuntu-popcon"}
+		"1": {"SourceFileName":"main.cpp","Compile":true,"CompileCmd":["g++", "-mcmodel=medium", "-std=c++14", "/work/main.cpp", "-o", "/work/a.out"],"CompileImage":"ubuntu-popcon","ExecCmd":["/work/a.out"],"ExecImage":"ubuntu-popcon"}
 	}
 }

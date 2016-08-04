@@ -1,5 +1,6 @@
 package main
 
+import "github.com/docker/docker/pkg/stdcopy"
 import "github.com/docker/engine-api/types"
 import "github.com/docker/engine-api/types/container"
 import "golang.org/x/net/context"
@@ -8,6 +9,25 @@ import "bytes"
 import "strconv"
 import "strings"
 import "archive/tar"
+
+type LengthLimitedString struct {
+	dst *string
+	Len int
+}
+
+func (lls LengthLimitedString) Write(b []byte) (int, error) {
+	if lls.dst == nil {
+		return len(b), nil
+	}
+
+	if len(b) + len(*lls.dst) > lls.Len {
+		*lls.dst += string(b[:lls.Len - len(*lls.dst)])
+	}else {
+		*lls.dst += string(b)
+	}
+
+	return len(b), nil
+}
 
 type Executor struct {
 	Name string
@@ -60,44 +80,15 @@ func (e *Executor) Run(input string) ExecResult {
 			return
 		}
 
-		var buf bytes.Buffer
-		for {
-			b := make([]byte, 128)
+		lls := LengthLimitedString{out, 100 * 1024 * 1024}
 
-			size, err := hijack.Reader.Read(b)
+		if opt.Stdout {
+			_, err = stdcopy.StdCopy(lls, LengthLimitedString{nil, 0}, hijack.Reader)
 
-			// Output Size Limitation
-			if out != nil && len(*out) < 100*1024*1024 {
-				buf.Write(b[0:size])
-
-				if buf.Len() >= 8 {
-					var size uint32
-					bin := buf.Bytes()
-
-					for i, v := range bin[4:8] {
-						shift := uint32((3 - i) * 8)
-
-						size |= uint32(v) << shift
-					}
-
-					if buf.Len() >= int(size+8) {
-						*out += string(bin[8 : size+8])
-						buf.Reset()
-						buf.Write(bin[size+8:])
-					}
-				}
-			}
-
-			if err != nil {
-				if err.Error() == "EOF" {
-					done <- nil
-				} else {
-					done <- err
-				}
-
-				return
-			}
+		}else {
+			_, err = stdcopy.StdCopy(LengthLimitedString{nil, 0}, lls, hijack.Reader)
 		}
+		done <- err
 	}
 
 	var stdout, stderr string
@@ -109,7 +100,6 @@ func (e *Executor) Run(input string) ExecResult {
 	<-stdinErr
 	<-stdoutErr
 	<-stderrErr
-	<-stdinErr
 
 	ctx := context.Background()
 	err := cli.ContainerStart(ctx, e.Name, types.ContainerStartOptions{})
@@ -118,6 +108,7 @@ func (e *Executor) Run(input string) ExecResult {
 		return ExecResult{ExecError, 0, 0, 0, "", "Failed to start a container. " + err.Error()}
 	}
 
+	<-stdinErr
 	<-stdoutErr
 	<-stderrErr
 
@@ -140,35 +131,89 @@ func (e *Executor) Run(input string) ExecResult {
 
 	buf := new(bytes.Buffer)
 	buf.ReadFrom(tarStream)
-	arrRes := strings.Split(buf.String(), " ")
+	exitCode := 0
 
-	if len(arrRes) != 2 {
+	lines := strings.Split(buf.String(), "\n")
+
+	if len(lines) == 3 {
+		for _, str := range strings.Split(lines[0], " ") {
+			code, err := strconv.ParseInt(str, 10, 32)
+
+			if err == nil {
+				exitCode = 128 + int(code)
+
+				goto loop
+			}
+		}
 		return ExecResult{ExecError, 0, 0, 0, "", "Failed to parse the result."}
+
+	loop:
 	}
 
-	execSec, err := strconv.ParseFloat(arrRes[0], 64)
+	var execTime int64
+	if len(lines) >= 2 {
+		var arrRes []string
 
-	if err != nil {
-		return ExecResult{ExecError, 0, 0, 0, "", "Failed to parse the execution result."}
-	}
+		if len(lines) == 2 {
+			arrRes = strings.Split(lines[0], " ")
+		}else {
+			arrRes = strings.Split(lines[1], " ")
+		}
 
-	execTime := int64(execSec * 1000)
+		if len(arrRes) != 2 {
 
-	exit64, err := strconv.ParseInt(strings.Split(arrRes[1], "\n")[0], 10, 32)
+			return ExecResult{ExecError, 0, 0, 0, "", "Failed to parse the result."}
+		}
 
-	if err != nil {
-		return ExecResult{ExecError, 0, 0, 0, "", "Failed to parse the exit code."}
-	}
+		execSec, err := strconv.ParseFloat(arrRes[0], 64)
 
-	exitCode := int(exit64)
+		if err != nil {
+			return ExecResult{ExecError, 0, 0, 0, "", "Failed to parse the execution result."}
+		}
 
-	if execSec*1000 > float64(e.Time) {
-		cli.ContainerKill(ctx, e.Name, "SIGKILL")
+		execTime = int64(execSec * 1000)
 
-		return ExecResult{ExecTimeLimitExceeded, 0, 0, 0, "", ""}
+		exit64, err := strconv.ParseInt(arrRes[1], 10, 32)
+
+		if err != nil {
+			return ExecResult{ExecError, 0, 0, 0, "", "Failed to parse the exit code."}
+		}
+
+		if exitCode == 0 {
+			exitCode = int(exit64)
+		}
+
+		if execSec*1000 > float64(e.Time) {
+			cli.ContainerKill(ctx, e.Name, "SIGKILL")
+
+			return ExecResult{ExecTimeLimitExceeded, 0, 0, 0, "", ""}
+		}
+
 	}
 
 	return ExecResult{ExecFinished, execTime, usedMem, exitCode, stdout, stderr}
+}
+
+func (e *Executor) CopyToContainer(root string, files []struct{name string; content string}) error {
+	buf := new(bytes.Buffer)
+
+	tw := tar.NewWriter(buf)
+
+	for i := range files {
+		err := tw.WriteHeader(&tar.Header{Name: files[i].name, Mode: 0777, Size: int64(len(files[i].content))})
+
+		if err != nil {
+			return err
+		}
+
+		_, err = tw.Write([]byte(files[i].content))
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return cli.CopyToContainer(context.Background(), e.Name, root, buf, types.CopyToContainerOptions{AllowOverwriteDirWithFile: true})
 }
 
 func (e *Executor) Delete() error {
