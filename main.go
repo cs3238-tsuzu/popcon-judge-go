@@ -10,6 +10,7 @@ import (
 
 	"github.com/cs3238-tsuzu/popcon-judge-go/Transfer"
 	"github.com/docker/engine-api/client"
+	"strings"
 )
 
 // SettingsTemplate is a template of a setting json
@@ -42,6 +43,10 @@ type SettingsInterface struct {
 
 func CreateStringPointer(str string) *string {
 	return &str
+}
+
+func ReplaceEndline(str string) string {
+	return strings.Replace(strings.Replace(str, "\r\n", "\n", -1), "\r", "\n", -1)
 }
 
 func main() {
@@ -194,7 +199,7 @@ func main() {
 			j.Exec = ExecRequest{
 				Image:          lang.ExecImage,
 				Cmd:            lang.ExecCmd,
-				SourceFileName: "",
+				SourceFileName: lang.SourceFileName,
 			}
 
 			casesChan := make(chan TCType, len(req.Cases))
@@ -227,14 +232,14 @@ func main() {
 					check.Compile = &ExecRequest{
 						Image:          lang.CompileImage,
 						Cmd:            lang.CompileCmd,
-						SourceFileName: lang.SourceFileName,
+						SourceFileName: "",
 					}
 				}
 
 				check.Exec = ExecRequest{
 					Image:          lang.ExecImage,
 					Cmd:            lang.ExecCmd,
-					SourceFileName: "",
+					SourceFileName: lang.SourceFileName,
 				}
 
 				checkerCasesChan = make(chan TCType, len(req.Cases))
@@ -359,8 +364,7 @@ func main() {
 							respArr[stat.Case] = res
 							checkerCasesChan <- TCType{ID: stat.Case, In: c.Input, Out: &stat.Stdout}
 						} else {
-
-							if stat.Stdout != req.Cases[strconv.FormatInt(int64(stat.Case), 10)].Output {
+							if ReplaceEndline(stat.Stdout) != req.Cases[strconv.FormatInt(int64(stat.Case), 10)].Output {
 								res.Status = transfer.WrongAnswer
 								totalStatus = transfer.WrongAnswer
 							}
@@ -393,12 +397,12 @@ func main() {
 								} else if stat.JR == RuntimeError {
 									resp.Status = transfer.WrongAnswer
 								} else {
-									resp.Msg = "Checker Program: " + JudgeResultCodeToStr[stat.JR]
+									resp.Msg = "Checker Program: " + JudgeResultCodeToStr[stat.JR] + "\n" + stat.Stderr
 									resp.Status = transfer.InternalError
 
-									if stat.JR == CompileError {
+/*									if stat.JR == CompileError {
 										resp.Msg += "\n" + stat.Stderr
-									}
+									}*/
 								}
 
 								trans.ResponseChan <- resp

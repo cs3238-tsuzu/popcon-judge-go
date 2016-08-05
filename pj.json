@@ -4,6 +4,7 @@
     "cpu_usage": 100,
 	"auth": "oregapcp",
 	"languages": {
-		"1": {"SourceFileName":"main.cpp","Compile":true,"CompileCmd":["g++", "-mcmodel=medium", "-std=c++14", "/work/main.cpp", "-o", "/work/a.out"],"CompileImage":"ubuntu-popcon","ExecCmd":["/work/a.out"],"ExecImage":"ubuntu-popcon"}
+		"1": {"SourceFileName":"main.cpp","Compile":true,"CompileCmd":["g++", "-mcmodel=medium", "-O2", "-std=c++14", "/work/main.cpp", "-o", "/work/a.out"],"CompileImage":"ubuntu-popcon","ExecCmd":["/work/a.out"],"ExecImage":"ubuntu-popcon"},
+		"2": {"SourceFileName":"main.txt","Compile":false,"CompileCmd":[],"CompileImage":"","ExecCmd":["cat", "/work/main.txt"],"ExecImage":"ubuntu-popcon"}
 	}
 }

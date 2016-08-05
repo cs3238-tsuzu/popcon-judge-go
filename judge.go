@@ -143,8 +143,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan TCType, killChan chan bo
 	}
 
 	// Source File
-	fp, err := os.Create(path + "/" + j.Compile.SourceFileName)
-
+	fp, err := os.Create(path + "/" + j.Exec.SourceFileName)
 	if err != nil {
 		ch <- CreateInternalError(-1, "Failed to create source file."+err.Error())
 
@@ -167,7 +166,7 @@ func (j *Judge) Run(ch chan<- JudgeStatus, tests <-chan TCType, killChan chan bo
 
 	fp.Close()
 
-	err = os.Chmod(path+"/"+j.Compile.SourceFileName, 0644)
+	err = os.Chmod(path+"/"+j.Exec.SourceFileName, 0644)
 
 	if err != nil {
 		ch <- CreateInternalError(-1, "Failed to chmod the source file. "+err.Error())
